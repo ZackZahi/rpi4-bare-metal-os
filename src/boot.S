@@ -1,5 +1,4 @@
-// boot.S - Startup code for Raspberry Pi 4
-// This code runs first when the Pi boots
+// boot.S - Startup code for Raspberry Pi 4 with interrupt support
 
 .section ".text.boot"
 
@@ -21,6 +20,13 @@ cpu0_start:
     // Stack grows downward from 0x80000
     ldr     x1, =_start
     mov     sp, x1
+
+    // Set up exception vector table
+    ldr     x1, =vectors
+    msr     vbar_el1, x1
+
+    // Enable IRQ interrupts (clear the I bit in DAIF)
+    msr     daifclr, #2
 
     // Clear BSS section (uninitialized data)
     ldr     x1, =__bss_start

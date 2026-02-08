@@ -8,12 +8,28 @@ ARMGNU	Makefile	/^ARMGNU ?= aarch64-elf$/;"	m
 ASMFLAGS	Makefile	/^ASMFLAGS = $/;"	m
 CFLAGS	Makefile	/^CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles -mcpu=cortex-a72$/;"	m
 ELF	Makefile	/^ELF = kernel8.elf$/;"	m
+GICC_BASE	gic.c	/^#define GICC_BASE /;"	d	file:
+GICC_CTLR	gic.c	/^#define GICC_CTLR /;"	d	file:
+GICC_EOIR	gic.c	/^#define GICC_EOIR /;"	d	file:
+GICC_IAR	gic.c	/^#define GICC_IAR /;"	d	file:
+GICC_PMR	gic.c	/^#define GICC_PMR /;"	d	file:
+GICD_BASE	gic.c	/^#define GICD_BASE /;"	d	file:
+GICD_CTLR	gic.c	/^#define GICD_CTLR /;"	d	file:
+GICD_ICFGR	gic.c	/^#define GICD_ICFGR /;"	d	file:
+GICD_IPRIORITYR	gic.c	/^#define GICD_IPRIORITYR /;"	d	file:
+GICD_ISENABLER	gic.c	/^#define GICD_ISENABLER /;"	d	file:
+GICD_ITARGETSR	gic.c	/^#define GICD_ITARGETSR /;"	d	file:
+GIC_BASE	gic.c	/^#define GIC_BASE /;"	d	file:
+GIC_H	gic.h	/^#define GIC_H$/;"	d
 GPFSEL1	kernel.c	/^#define GPFSEL1 /;"	d	file:
 GPPUD	kernel.c	/^#define GPPUD /;"	d	file:
 GPPUDCLK0	kernel.c	/^#define GPPUDCLK0 /;"	d	file:
 MMIO_BASE	kernel.c	/^#define MMIO_BASE /;"	d	file:
-OBJS	Makefile	/^OBJS = boot.o kernel.o$/;"	m
+OBJS	Makefile	/^OBJS = boot.o vectors.o kernel.o timer.o gic.o$/;"	m
 TARGET	Makefile	/^TARGET = kernel8.img$/;"	m
+TIMER_H	timer.h	/^#define TIMER_H$/;"	d
+TIMER_IRQ	gic.c	/^#define TIMER_IRQ /;"	d	file:
+TIMER_IRQ	kernel.c	/^#define TIMER_IRQ /;"	d	file:
 UART0_CR	kernel.c	/^#define UART0_CR /;"	d	file:
 UART0_DR	kernel.c	/^#define UART0_DR /;"	d	file:
 UART0_FBRD	kernel.c	/^#define UART0_FBRD /;"	d	file:
@@ -27,7 +43,24 @@ bss_clear_loop	boot.S	/^bss_clear_loop:$/;"	l
 cpu0_start	boot.S	/^cpu0_start:$/;"	l
 cpu_halt	boot.S	/^cpu_halt:$/;"	l
 delay	kernel.c	/^void delay(unsigned int count) {$/;"	f
+gic_enable_interrupt	gic.c	/^void gic_enable_interrupt(unsigned int int_id) {$/;"	f
+gic_end_interrupt	gic.c	/^void gic_end_interrupt(unsigned int int_id) {$/;"	f
+gic_get_interrupt	gic.c	/^unsigned int gic_get_interrupt(void) {$/;"	f
+gic_init	gic.c	/^void gic_init(void) {$/;"	f
+hang	vectors.S	/^hang:$/;"	l
+irq_handler	kernel.c	/^void irq_handler(void) {$/;"	f
+irq_handler_stub	vectors.S	/^irq_handler_stub:$/;"	l
 kernel_main	kernel.c	/^void kernel_main(void) {$/;"	f
+tick_count	timer.c	/^static volatile unsigned long tick_count = 0;$/;"	v	file:
+timer_delay_ms	timer.c	/^void timer_delay_ms(unsigned int ms) {$/;"	f
+timer_freq	timer.c	/^static unsigned long timer_freq = 0;$/;"	v	file:
+timer_get_frequency	timer.c	/^unsigned long timer_get_frequency(void) {$/;"	f
+timer_get_tick_count	timer.c	/^unsigned long timer_get_tick_count(void) {$/;"	f
+timer_get_ticks	timer.c	/^unsigned long timer_get_ticks(void) {$/;"	f
+timer_handle_irq	timer.c	/^void timer_handle_irq(void) {$/;"	f
+timer_init	timer.c	/^void timer_init(unsigned int interval_ms) {$/;"	f
 uart_init	kernel.c	/^void uart_init(void) {$/;"	f
+uart_put_dec	kernel.c	/^void uart_put_dec(unsigned long value) {$/;"	f
 uart_putc	kernel.c	/^void uart_putc(unsigned char c) {$/;"	f
 uart_puts	kernel.c	/^void uart_puts(const char* str) {$/;"	f
+vectors	vectors.S	/^vectors:$/;"	l
