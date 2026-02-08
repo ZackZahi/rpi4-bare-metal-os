@@ -1,0 +1,33 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+ARMGNU	Makefile	/^ARMGNU ?= aarch64-elf$/;"	m
+ASMFLAGS	Makefile	/^ASMFLAGS = $/;"	m
+CFLAGS	Makefile	/^CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles -mcpu=cortex-a72$/;"	m
+ELF	Makefile	/^ELF = kernel8.elf$/;"	m
+GPFSEL1	kernel.c	/^#define GPFSEL1 /;"	d	file:
+GPPUD	kernel.c	/^#define GPPUD /;"	d	file:
+GPPUDCLK0	kernel.c	/^#define GPPUDCLK0 /;"	d	file:
+MMIO_BASE	kernel.c	/^#define MMIO_BASE /;"	d	file:
+OBJS	Makefile	/^OBJS = boot.o kernel.o$/;"	m
+TARGET	Makefile	/^TARGET = kernel8.img$/;"	m
+UART0_CR	kernel.c	/^#define UART0_CR /;"	d	file:
+UART0_DR	kernel.c	/^#define UART0_DR /;"	d	file:
+UART0_FBRD	kernel.c	/^#define UART0_FBRD /;"	d	file:
+UART0_FR	kernel.c	/^#define UART0_FR /;"	d	file:
+UART0_IBRD	kernel.c	/^#define UART0_IBRD /;"	d	file:
+UART0_ICR	kernel.c	/^#define UART0_ICR /;"	d	file:
+UART0_LCRH	kernel.c	/^#define UART0_LCRH /;"	d	file:
+_start	boot.S	/^_start:$/;"	l
+bss_clear_done	boot.S	/^bss_clear_done:$/;"	l
+bss_clear_loop	boot.S	/^bss_clear_loop:$/;"	l
+cpu0_start	boot.S	/^cpu0_start:$/;"	l
+cpu_halt	boot.S	/^cpu_halt:$/;"	l
+delay	kernel.c	/^void delay(unsigned int count) {$/;"	f
+kernel_main	kernel.c	/^void kernel_main(void) {$/;"	f
+uart_init	kernel.c	/^void uart_init(void) {$/;"	f
+uart_putc	kernel.c	/^void uart_putc(unsigned char c) {$/;"	f
+uart_puts	kernel.c	/^void uart_puts(const char* str) {$/;"	f

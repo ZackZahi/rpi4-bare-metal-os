@@ -1,0 +1,7 @@
+# Build artifacts
+*.o
+*.elf
+*.img
+
+# macOS
+.DS_Store
