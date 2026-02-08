@@ -10,7 +10,6 @@ ASMFLAGS	Makefile	/^ASMFLAGS =$/;"	m
 BUILD_DIR	Makefile	/^BUILD_DIR = build$/;"	m
 CFLAGS	Makefile	/^CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles -mcpu=cortex-a72 -I$(INC_DIR)$/;"	m
 CNTP_IRQ_ENABLE	src/drivers/gic.c	/^#define CNTP_IRQ_ENABLE /;"	d	file:
-CONTEXT_FRAME_SIZE	src/drivers/task.c	/^#define CONTEXT_FRAME_SIZE /;"	d	file:
 CORE0_IRQ_SOURCE	src/drivers/gic.c	/^#define CORE0_IRQ_SOURCE /;"	d	file:
 CORE0_TIMER_IRQ_CTRL	src/drivers/gic.c	/^#define CORE0_TIMER_IRQ_CTRL /;"	d	file:
 DRIVER_DIR	Makefile	/^DRIVER_DIR = $(SRC_DIR)\/drivers$/;"	m
@@ -32,7 +31,7 @@ GPPUD	src/drivers/uart.c	/^#define GPPUD /;"	d	file:
 GPPUDCLK0	src/drivers/uart.c	/^#define GPPUDCLK0 /;"	d	file:
 INC_DIR	Makefile	/^INC_DIR = include$/;"	m
 IRQ_SOURCE_CNTP	src/drivers/gic.c	/^#define IRQ_SOURCE_CNTP /;"	d	file:
-MAX_TASKS	src/drivers/task.c	/^#define MAX_TASKS /;"	d	file:
+MAX_TASKS	include/task.h	/^#define MAX_TASKS /;"	d
 MMIO_BASE	src/drivers/uart.c	/^#define MMIO_BASE /;"	d	file:
 OBJS	Makefile	/^OBJS = $(BUILD_DIR)\/boot.o \\$/;"	m
 SRC_DIR	Makefile	/^SRC_DIR = src$/;"	m
@@ -43,6 +42,7 @@ TASK_H	include/task.h	/^#define TASK_H$/;"	d
 TASK_READY	include/task.h	/^    TASK_READY,$/;"	e	enum:__anon1
 TASK_RUNNING	include/task.h	/^    TASK_RUNNING,$/;"	e	enum:__anon1
 TIMER_H	include/timer.h	/^#define TIMER_H$/;"	d
+TRAPFRAME_SIZE	include/task.h	/^#define TRAPFRAME_SIZE /;"	d
 UART0_CR	src/drivers/uart.c	/^#define UART0_CR /;"	d	file:
 UART0_DR	src/drivers/uart.c	/^#define UART0_DR /;"	d	file:
 UART0_FBRD	src/drivers/uart.c	/^#define UART0_FBRD /;"	d	file:
@@ -64,6 +64,7 @@ delay	src/drivers/uart.c	/^static void delay(unsigned int count) {$/;"	f	file:
 dequeue_ready_task	src/drivers/task.c	/^static task_t *dequeue_ready_task(void) {$/;"	f	file:
 enqueue_task	src/drivers/task.c	/^static void enqueue_task(task_t *task) {$/;"	f	file:
 get_current_task	src/drivers/task.c	/^task_t *get_current_task(void) {$/;"	f
+get_task_pool	src/drivers/task.c	/^task_t *get_task_pool(void) {$/;"	f
 gic_enable_interrupt	src/drivers/gic.c	/^void gic_enable_interrupt(unsigned int int_id) {$/;"	f
 gic_enable_timer_irq	src/drivers/gic.c	/^void gic_enable_timer_irq(void) {$/;"	f
 gic_end_interrupt	src/drivers/gic.c	/^void gic_end_interrupt(unsigned int int_id) {$/;"	f
@@ -72,33 +73,36 @@ gic_init	src/drivers/gic.c	/^void gic_init(void) {$/;"	f
 gic_timer_irq_pending	src/drivers/gic.c	/^int gic_timer_irq_pending(void) {$/;"	f
 hang	src/vectors.S	/^hang:$/;"	l
 id	include/task.h	/^    unsigned int id;$/;"	m	struct:task
-idle_task	src/drivers/task.c	/^static void idle_task(void) {$/;"	f	file:
-init_task_stack	src/drivers/task.c	/^static void init_task_stack(task_t *task, void (*entry_point)(void)) {$/;"	f	file:
-irq_handler	src/kernel.c	/^void irq_handler(void) {$/;"	f
-irq_handler_stub	src/vectors.S	/^irq_handler_stub:$/;"	l
+init_task_trapframe	src/drivers/task.c	/^static void init_task_trapframe(task_t *task, void (*entry_point)(void)) {$/;"	f	file:
+irq_entry	src/vectors.S	/^irq_entry:$/;"	l
+irq_handler_c	src/kernel.c	/^unsigned long irq_handler_c(unsigned long sp) {$/;"	f
 kernel_main	src/kernel.c	/^void kernel_main(void) {$/;"	f
 name	include/task.h	/^    char name[32];$/;"	m	struct:task
-next	include/task.h	/^    struct task *next;          \/\/ Ready-queue link$/;"	m	struct:task	typeref:struct:task::task
+next	include/task.h	/^    struct task *next;$/;"	m	struct:task	typeref:struct:task::task
 next_task_id	src/drivers/task.c	/^static unsigned int next_task_id = 0;$/;"	v	file:
 process_command	src/kernel.c	/^static void process_command(char *cmd) {$/;"	f	file:
 ready_queue_head	src/drivers/task.c	/^static task_t *ready_queue_head = 0;$/;"	v	file:
-schedule	src/drivers/task.c	/^void schedule(void) {$/;"	f
+schedule_irq	src/drivers/task.c	/^unsigned long schedule_irq(unsigned long old_sp) {$/;"	f
+scheduler_enabled	src/kernel.c	/^static volatile int scheduler_enabled = 0;$/;"	v	file:
 scheduler_init	src/drivers/task.c	/^void scheduler_init(void) {$/;"	f
-sleep_until	include/task.h	/^    unsigned long sleep_until;  \/\/ Tick count to wake at$/;"	m	struct:task
-sp	include/task.h	/^    unsigned long sp;           \/\/ Saved stack pointer$/;"	m	struct:task
-stack	include/task.h	/^    unsigned long stack[1024];  \/\/ 8KB stack per task (1024 x 8 bytes)$/;"	m	struct:task
+sleep_until	include/task.h	/^    unsigned long sleep_until;$/;"	m	struct:task
+sp	include/task.h	/^    unsigned long sp;           \/\/ Saved stack pointer (points to trapframe)$/;"	m	struct:task
+stack	include/task.h	/^    unsigned long stack[1024];  \/\/ 8KB stack per task$/;"	m	struct:task
 state	include/task.h	/^    task_state_t state;$/;"	m	struct:task
+state_name	src/kernel.c	/^static const char *state_name(task_state_t s) {$/;"	f	file:
 strcmp	src/kernel.c	/^static int strcmp(const char *s1, const char *s2) {$/;"	f	file:
 strcpy_local	src/drivers/task.c	/^static void strcpy_local(char *dst, const char *src) {$/;"	f	file:
 switch_to	src/context.S	/^switch_to:$/;"	l
 task	include/task.h	/^typedef struct task {$/;"	s
+task_counter	src/kernel.c	/^static void task_counter(void) {$/;"	f	file:
 task_create	src/drivers/task.c	/^void task_create(void (*entry_point)(void), const char *name) {$/;"	f
 task_exit	src/drivers/task.c	/^void task_exit(void) {$/;"	f
+task_exit_trampoline	src/drivers/task.c	/^static void task_exit_trampoline(void) {$/;"	f	file:
 task_pool	src/drivers/task.c	/^static task_t task_pool[MAX_TASKS];$/;"	v	file:
 task_sleep	src/drivers/task.c	/^void task_sleep(unsigned int ms) {$/;"	f
+task_spinner	src/kernel.c	/^static void task_spinner(void) {$/;"	f	file:
 task_state_t	include/task.h	/^} task_state_t;$/;"	t	typeref:enum:__anon1
 task_t	include/task.h	/^} task_t;$/;"	t	typeref:struct:task
-task_wrapper	src/drivers/task.c	/^static void task_wrapper(void) {$/;"	f	file:
 task_yield	src/drivers/task.c	/^void task_yield(void) {$/;"	f
 tick_count	src/drivers/timer.c	/^static volatile unsigned long tick_count = 0;$/;"	v	file:
 timer_delay_ms	src/drivers/timer.c	/^void timer_delay_ms(unsigned int ms) {$/;"	f
