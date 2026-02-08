@@ -5,10 +5,11 @@ A bare-metal operating system for Raspberry Pi 4, designed to run in QEMU.
 ## Features
 
 - ✅ Multi-core boot (CPU 0 active, CPUs 1-3 halted)
-- ✅ UART driver for serial I/O at 115200 baud
+- ✅ **UART driver with input/output** at 115200 baud
+- ✅ **Interactive command-line interface**
 - ✅ GIC-400 interrupt controller driver
 - ✅ ARM Generic Timer driver
-- ✅ **Timer interrupts** (100ms interval)
+- ✅ Timer interrupts (100ms interval)
 - ✅ Exception handling infrastructure
 
 ## Prerequisites
@@ -22,13 +23,25 @@ brew install qemu
 
 ## Project Structure
 
-- `boot.S` - Assembly boot code (sets up stack, vector table, enables interrupts)
-- `vectors.S` - Exception vector table and IRQ handler stub
-- `kernel.c` - Main C kernel with UART driver and interrupt handling
-- `timer.c` / `timer.h` - ARM Generic Timer driver with interrupt support
-- `gic.c` / `gic.h` - GIC-400 interrupt controller driver
-- `linker.ld` - Linker script defining memory layout
-- `Makefile` - Build system
+```
+qemu-rpi4-kernel/
+├── src/
+│   ├── boot.S              - Boot code
+│   ├── vectors.S           - Exception vectors
+│   ├── kernel.c            - Main kernel with command processor
+│   └── drivers/
+│       ├── uart.c          - UART driver (input/output)
+│       ├── timer.c         - Timer driver
+│       └── gic.c           - Interrupt controller
+├── include/
+│   ├── uart.h
+│   ├── timer.h
+│   └── gic.h
+├── build/                  - Build artifacts
+├── linker.ld
+├── Makefile
+└── README.md
+```
 
 ## Building
 
@@ -44,83 +57,123 @@ This produces `kernel8.img` which can be loaded by QEMU.
 make run
 ```
 
-You should see output like:
+You should see:
 ```
 ========================================
-  Raspberry Pi 4 OS - Timer Interrupts
+  Raspberry Pi 4 OS - UART Input
 ========================================
 
 Initializing system...
 Setting up GIC interrupt controller...
 Timer frequency: 54000000 Hz
 Setting up timer interrupts (100ms interval)...
-System ready! Timer interrupts enabled.
-You should see a tick message every second.
+System ready!
 
-Timer tick: 10
-Timer tick: 20
-Timer tick: 30
-...
+Type 'help' for available commands.
+
+rpi4> _
 ```
 
 Press `Ctrl+A` then `X` to exit QEMU.
+
+## Available Commands
+
+Type these at the `rpi4>` prompt:
+
+- `help` - Show available commands
+- `echo` - Echo back your input
+- `time` - Show system uptime
+- `info` - Display system information
+- `clear` - Clear the screen
+- `hello` - Print a greeting
+
+### Example Session
+
+```
+rpi4> help
+Available commands:
+  help      - Show this help message
+  echo      - Echo back what you type
+  time      - Show current tick count
+  info      - Show system information
+  clear     - Clear screen
+  hello     - Print a greeting
+
+rpi4> hello
+Hello from bare metal!
+Welcome to Raspberry Pi 4 OS
+
+rpi4> time
+Uptime: 5 seconds (50 ticks)
+
+rpi4> info
+Raspberry Pi 4 Bare Metal OS
+CPU: ARM Cortex-A72 (ARMv8-A)
+Timer frequency: 54000000 Hz
+Features: UART I/O, Timer Interrupts, GIC-400
+```
+
+## Features Explained
+
+### UART Driver
+
+- **Input**: Blocking (`uart_getc`) and non-blocking (`uart_getc_nonblock`) read
+- **Output**: Character and string output with formatting
+- **Line editing**: Backspace, Ctrl+C, Ctrl+U support
+- **Echo**: Characters are echoed as you type
+
+### Command Processing
+
+- Simple command-line interface with prompt
+- String parsing and command dispatch
+- Easily extensible - add new commands in `process_command()`
+
+### Timer Interrupts
+
+- Background timer prints uptime every 10 seconds
+- Runs independently while you type commands
+- Demonstrates interrupt-driven multitasking
 
 ## How It Works
 
 ### Boot Process
 
-1. **boot.S** - CPU 0 initializes, sets up exception vector table at `vbar_el1`, enables IRQ interrupts
-2. **kernel_main()** - Initializes UART, GIC, and timer, then enters WFI (Wait For Interrupt) loop
-3. Timer generates interrupts every 100ms
+1. **boot.S** - Initialize CPU, set up interrupts
+2. **kernel_main()** - Initialize UART, GIC, timer
+3. Enter command loop reading from UART
 
-### Interrupt Handling Flow
+### Command Loop
 
-1. Hardware generates timer interrupt
-2. GIC-400 signals the interrupt to CPU
-3. CPU jumps to exception vector table (`vectors.S`)
-4. **irq_handler_stub** saves all registers to stack
-5. Calls C function **irq_handler()** in kernel.c
-6. **irq_handler()** reads interrupt ID from GIC
-7. Calls **timer_handle_irq()** to service the timer
-8. Signals end-of-interrupt to GIC
-9. Registers restored, execution returns via `eret`
+1. Print prompt (`rpi4> `)
+2. Read line with `uart_gets()` (blocks until Enter)
+3. Parse and execute command
+4. Repeat
 
-### ARM Generic Timer
+### Interrupt Handling
 
-- Uses the built-in ARMv8 Generic Timer
-- Configured for EL1 physical timer (CNTP)
-- Frequency varies by QEMU version (typically 54 MHz)
-- Generates periodic interrupts
+- Timer interrupts fire every 100ms in background
+- IRQ handler processes interrupt while command loop runs
+- Demonstrates cooperative multitasking
 
-### GIC-400 (Generic Interrupt Controller)
+## Technical Details
 
-- Industry-standard ARM interrupt controller
-- Distributor routes interrupts to CPUs
-- CPU interface allows CPU to acknowledge and complete interrupts
-- Timer interrupt ID: 30 (physical timer PPI)
-
-## Raspberry Pi 4 Specific Details
-
-- **CPU**: Quad-core Cortex-A72 (ARMv8-A, 64-bit)
+- **Architecture**: ARMv8-A (AArch64)
+- **CPU**: Cortex-A72
 - **Peripheral Base**: 0xFE000000
 - **GIC Base**: 0xFF840000
-- **UART Clock**: 48MHz
-- **QEMU Support**: Uses `-M raspi4b` machine type
+- **UART**: PL011, 115200 baud, 8N1
+- **Timer**: ARM Generic Timer (CNTP)
 
 ## Next Steps
 
-Potential features to add:
-- [ ] UART input (keyboard)
-- [ ] Simple shell/command interface
-- [ ] Memory management (MMU, page tables)
-- [ ] Process scheduler
-- [ ] Multi-core support (wake CPUs 1-3)
-- [ ] GPIO control
-- [ ] Framebuffer graphics
+- [ ] Command history (up/down arrows)
+- [ ] Tab completion
+- [ ] Memory management commands
+- [ ] Process/task management
+- [ ] File system support
+- [ ] Multi-core commands
 
 ## Debugging
-
-To debug with GDB:
 
 ```bash
 make debug
@@ -133,12 +186,3 @@ aarch64-elf-gdb kernel8.elf
 (gdb) break kernel_main
 (gdb) continue
 ```
-
-## Technical Details
-
-- **Architecture**: ARMv8-A (AArch64)
-- **Exception Level**: EL1 (kernel mode)
-- **Memory Layout**: Kernel at 0x80000, stack grows down from 0x80000
-- **Interrupts**: IRQ enabled, FIQ/SError disabled
-- **Timer**: ARM Generic Timer, physical timer (CNTP)
-- **Interrupt Controller**: GIC-400
