@@ -11,15 +11,15 @@ BUILD_DIR = build
 
 # Compiler flags
 CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles -mcpu=cortex-a72 -I$(INC_DIR)
-ASMFLAGS = 
-
-# Source files
-C_SOURCES = $(SRC_DIR)/kernel.c $(DRIVER_DIR)/timer.c $(DRIVER_DIR)/gic.c $(DRIVER_DIR)/uart.c
-ASM_SOURCES = $(SRC_DIR)/boot.S $(SRC_DIR)/vectors.S
+ASMFLAGS =
 
 # Object files
-OBJS = $(BUILD_DIR)/boot.o $(BUILD_DIR)/vectors.o $(BUILD_DIR)/kernel.o \
-       $(BUILD_DIR)/timer.o $(BUILD_DIR)/gic.o $(BUILD_DIR)/uart.o
+OBJS = $(BUILD_DIR)/boot.o \
+       $(BUILD_DIR)/vectors.o \
+       $(BUILD_DIR)/kernel.o \
+       $(BUILD_DIR)/uart.o \
+       $(BUILD_DIR)/timer.o \
+       $(BUILD_DIR)/gic.o
 
 # Output
 TARGET = kernel8.img
@@ -70,5 +70,4 @@ debug: $(TARGET)
 clean:
 	rm -rf $(BUILD_DIR) *.elf *.img
 
-# Phony targets
 .PHONY: all clean run debug

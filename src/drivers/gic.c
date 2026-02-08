@@ -1,78 +1,101 @@
-// gic.c - GIC-400 (Generic Interrupt Controller) driver for Raspberry Pi 4
+// gic.c - GIC-400 + ARM Local Peripherals interrupt controller for RPi4
+//
+// On real RPi4 hardware, the GIC-400 handles interrupt routing.
+// On QEMU's raspi4b, the ARM generic timer interrupt is routed via
+// the BCM2836-style ARM Local Peripherals controller, NOT the GIC.
+//
+// The local peripherals are at physical 0x40000000 on RPi2/3, but
+// on RPi4 they are remapped to 0xFF800000.
+//
+// To get timer interrupts working on QEMU raspi4b, we need to:
+//   1. Enable the timer via ARM system registers (done in timer.c)
+//   2. Unmask CNTP interrupt for core 0 at 0xFF800040
+//   3. The IRQ will then fire through the vector table
+//
+// We still initialise the GIC for completeness (needed on real hw).
 
 #include "gic.h"
 
-// GIC-400 base addresses for Raspberry Pi 4
-#define GIC_BASE        0xFF840000
+// ---- GIC-400 registers ----
+#define GIC_BASE        0xFF840000UL
 
-// GIC Distributor registers
 #define GICD_BASE       (GIC_BASE + 0x1000)
-#define GICD_CTLR       ((volatile unsigned int*)(GICD_BASE + 0x000))
-#define GICD_ISENABLER  ((volatile unsigned int*)(GICD_BASE + 0x100))
-#define GICD_IPRIORITYR ((volatile unsigned int*)(GICD_BASE + 0x400))
-#define GICD_ITARGETSR  ((volatile unsigned int*)(GICD_BASE + 0x800))
-#define GICD_ICFGR      ((volatile unsigned int*)(GICD_BASE + 0xC00))
+#define GICD_CTLR       ((volatile unsigned int *)(GICD_BASE + 0x000))
+#define GICD_ISENABLER  ((volatile unsigned int *)(GICD_BASE + 0x100))
+#define GICD_IPRIORITYR ((volatile unsigned int *)(GICD_BASE + 0x400))
+#define GICD_ITARGETSR  ((volatile unsigned int *)(GICD_BASE + 0x800))
 
-// GIC CPU Interface registers
 #define GICC_BASE       (GIC_BASE + 0x2000)
-#define GICC_CTLR       ((volatile unsigned int*)(GICC_BASE + 0x000))
-#define GICC_PMR        ((volatile unsigned int*)(GICC_BASE + 0x004))
-#define GICC_IAR        ((volatile unsigned int*)(GICC_BASE + 0x00C))
-#define GICC_EOIR       ((volatile unsigned int*)(GICC_BASE + 0x010))
+#define GICC_CTLR       ((volatile unsigned int *)(GICC_BASE + 0x000))
+#define GICC_PMR        ((volatile unsigned int *)(GICC_BASE + 0x004))
+#define GICC_IAR        ((volatile unsigned int *)(GICC_BASE + 0x00C))
+#define GICC_EOIR       ((volatile unsigned int *)(GICC_BASE + 0x010))
 
-// ARM Generic Timer interrupt ID for physical timer
-#define TIMER_IRQ       30
+// ---- ARM Local Peripherals (BCM2836-style) ----
+// On RPi4 these are at 0xFF800000 (remapped from 0x40000000)
+#define ARM_LOCAL_BASE          0xFF800000UL
+#define CORE0_TIMER_IRQ_CTRL    ((volatile unsigned int *)(ARM_LOCAL_BASE + 0x40))
+#define CORE0_IRQ_SOURCE        ((volatile unsigned int *)(ARM_LOCAL_BASE + 0x60))
 
-// Initialize the GIC
+// Bit 1 in CORE0_TIMER_IRQ_CTRL = nCNTPNSIRQ (physical non-secure timer)
+// Bit 0 = nCNTPSIRQ (physical secure timer)
+// Bit 3 = nCNTVIRQ (virtual timer)
+#define CNTP_IRQ_ENABLE         (1 << 1)   // Non-secure physical timer
+
+// Bit in CORE0_IRQ_SOURCE that indicates CNTP fired
+#define IRQ_SOURCE_CNTP         (1 << 1)
+
 void gic_init(void) {
-    // Disable distributor
+    // Disable distributor and CPU interface
     *GICD_CTLR = 0;
-    
-    // Disable CPU interface
     *GICC_CTLR = 0;
-    
-    // Set priority mask to lowest priority (allow all interrupts)
+
+    // Allow all priority levels
     *GICC_PMR = 0xFF;
-    
-    // Enable distributor
+
+    // Enable distributor and CPU interface
     *GICD_CTLR = 1;
-    
-    // Enable CPU interface
     *GICC_CTLR = 1;
 }
 
-// Enable a specific interrupt
 void gic_enable_interrupt(unsigned int int_id) {
-    // Set interrupt priority (lower number = higher priority)
-    unsigned int priority_reg = int_id / 4;
-    unsigned int priority_shift = (int_id % 4) * 8;
-    volatile unsigned int* priority_ptr = GICD_IPRIORITYR + priority_reg;
-    unsigned int val = *priority_ptr;
-    val &= ~(0xFF << priority_shift);
-    val |= (0xA0 << priority_shift);  // Priority 0xA0
-    *priority_ptr = val;
-    
-    // Set interrupt target to CPU 0
-    unsigned int target_reg = int_id / 4;
-    unsigned int target_shift = (int_id % 4) * 8;
-    volatile unsigned int* target_ptr = GICD_ITARGETSR + target_reg;
-    val = *target_ptr;
-    val &= ~(0xFF << target_shift);
-    val |= (0x01 << target_shift);  // Target CPU 0
-    *target_ptr = val;
-    
-    // Enable the interrupt
-    unsigned int enable_reg = int_id / 32;
-    unsigned int enable_bit = int_id % 32;
-    GICD_ISENABLER[enable_reg] = (1 << enable_bit);
+    // GIC: set priority
+    unsigned int reg = int_id / 4;
+    unsigned int shift = (int_id % 4) * 8;
+    volatile unsigned int *prio = GICD_IPRIORITYR + reg;
+    unsigned int val = *prio;
+    val &= ~(0xFF << shift);
+    val |= (0xA0 << shift);
+    *prio = val;
+
+    // GIC: target CPU 0
+    volatile unsigned int *tgt = GICD_ITARGETSR + reg;
+    val = *tgt;
+    val &= ~(0xFF << shift);
+    val |= (0x01 << shift);
+    *tgt = val;
+
+    // GIC: enable the interrupt
+    unsigned int en_reg = int_id / 32;
+    unsigned int en_bit = int_id % 32;
+    GICD_ISENABLER[en_reg] = (1 << en_bit);
 }
 
-// Get the current interrupt ID
+// Enable the physical timer interrupt via ARM Local Peripherals
+// This is what actually makes QEMU raspi4b deliver the IRQ
+void gic_enable_timer_irq(void) {
+    *CORE0_TIMER_IRQ_CTRL = CNTP_IRQ_ENABLE;
+}
+
+// Check if the timer IRQ is pending via the local interrupt source register
+int gic_timer_irq_pending(void) {
+    return (*CORE0_IRQ_SOURCE & IRQ_SOURCE_CNTP) != 0;
+}
+
 unsigned int gic_get_interrupt(void) {
     return *GICC_IAR & 0x3FF;
 }
 
-// Signal end of interrupt
 void gic_end_interrupt(unsigned int int_id) {
     *GICC_EOIR = int_id;
 }
