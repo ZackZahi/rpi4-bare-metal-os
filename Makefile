@@ -1,32 +1,31 @@
 # Makefile for Raspberry Pi 4 Bare Metal OS
 
-# Toolchain
 ARMGNU ?= aarch64-elf
 
-# Directories
 SRC_DIR = src
 DRIVER_DIR = $(SRC_DIR)/drivers
 INC_DIR = include
 BUILD_DIR = build
 
-# Compiler flags
-CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles -mcpu=cortex-a72 -I$(INC_DIR)
+# -fno-builtin: don't replace loops with memset/memcpy
+# -fno-tree-loop-distribute-patterns: don't turn loops into library calls
+CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles \
+         -fno-builtin -fno-tree-loop-distribute-patterns \
+         -mcpu=cortex-a72 -I$(INC_DIR)
 ASMFLAGS =
 
-# Object files (boot must be first)
 OBJS = $(BUILD_DIR)/boot.o \
        $(BUILD_DIR)/vectors.o \
        $(BUILD_DIR)/kernel.o \
        $(BUILD_DIR)/uart.o \
        $(BUILD_DIR)/timer.o \
        $(BUILD_DIR)/gic.o \
-       $(BUILD_DIR)/task.o
+       $(BUILD_DIR)/task.o \
+       $(BUILD_DIR)/memory.o
 
-# Output
 TARGET = kernel8.img
 ELF = kernel8.elf
 
-# Default target
 all: $(BUILD_DIR) $(TARGET)
 
 $(BUILD_DIR):

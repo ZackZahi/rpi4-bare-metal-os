@@ -7,8 +7,11 @@
 ARMGNU	Makefile	/^ARMGNU ?= aarch64-elf$/;"	m
 ARM_LOCAL_BASE	src/drivers/gic.c	/^#define ARM_LOCAL_BASE /;"	d	file:
 ASMFLAGS	Makefile	/^ASMFLAGS =$/;"	m
+BITMAP_ADDR	src/drivers/memory.c	/^#define BITMAP_ADDR /;"	d	file:
+BITMAP_SIZE	src/drivers/memory.c	/^#define BITMAP_SIZE /;"	d	file:
+BLOCK_MAGIC	src/drivers/memory.c	/^#define BLOCK_MAGIC /;"	d	file:
 BUILD_DIR	Makefile	/^BUILD_DIR = build$/;"	m
-CFLAGS	Makefile	/^CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles -mcpu=cortex-a72 -I$(INC_DIR)$/;"	m
+CFLAGS	Makefile	/^CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles \\$/;"	m
 CNTP_IRQ_ENABLE	src/drivers/gic.c	/^#define CNTP_IRQ_ENABLE /;"	d	file:
 CORE0_IRQ_SOURCE	src/drivers/gic.c	/^#define CORE0_IRQ_SOURCE /;"	d	file:
 CORE0_TIMER_IRQ_CTRL	src/drivers/gic.c	/^#define CORE0_TIMER_IRQ_CTRL /;"	d	file:
@@ -29,11 +32,19 @@ GIC_H	include/gic.h	/^#define GIC_H$/;"	d
 GPFSEL1	src/drivers/uart.c	/^#define GPFSEL1 /;"	d	file:
 GPPUD	src/drivers/uart.c	/^#define GPPUD /;"	d	file:
 GPPUDCLK0	src/drivers/uart.c	/^#define GPPUDCLK0 /;"	d	file:
+HEADER_SIZE	src/drivers/memory.c	/^#define HEADER_SIZE /;"	d	file:
+HEAP_PAGES	src/drivers/memory.c	/^#define HEAP_PAGES /;"	d	file:
+HEAP_SIZE	src/drivers/memory.c	/^#define HEAP_SIZE /;"	d	file:
 INC_DIR	Makefile	/^INC_DIR = include$/;"	m
 IRQ_SOURCE_CNTP	src/drivers/gic.c	/^#define IRQ_SOURCE_CNTP /;"	d	file:
+MANAGED_PAGES	src/drivers/memory.c	/^#define MANAGED_PAGES /;"	d	file:
+MANAGED_SIZE	src/drivers/memory.c	/^#define MANAGED_SIZE /;"	d	file:
 MAX_TASKS	include/task.h	/^#define MAX_TASKS /;"	d
+MEMORY_H	include/memory.h	/^#define MEMORY_H$/;"	d
 MMIO_BASE	src/drivers/uart.c	/^#define MMIO_BASE /;"	d	file:
 OBJS	Makefile	/^OBJS = $(BUILD_DIR)\/boot.o \\$/;"	m
+PAGE_SHIFT	include/memory.h	/^#define PAGE_SHIFT /;"	d
+PAGE_SIZE	include/memory.h	/^#define PAGE_SIZE /;"	d
 SRC_DIR	Makefile	/^SRC_DIR = src$/;"	m
 TARGET	Makefile	/^TARGET = kernel8.img$/;"	m
 TASK_BLOCKED	include/task.h	/^    TASK_BLOCKED,$/;"	e	enum:__anon1
@@ -56,6 +67,11 @@ UART_H	include/uart.h	/^#define UART_H$/;"	d
 _start	src/boot.S	/^_start:$/;"	l
 at_el1	src/boot.S	/^at_el1:$/;"	l
 at_el2	src/boot.S	/^at_el2:$/;"	l
+bitmap_clear	src/drivers/memory.c	/^static inline void bitmap_clear(unsigned long local) {$/;"	f	file:
+bitmap_set	src/drivers/memory.c	/^static inline void bitmap_set(unsigned long local) {$/;"	f	file:
+bitmap_test	src/drivers/memory.c	/^static inline int bitmap_test(unsigned long local) {$/;"	f	file:
+block_header	src/drivers/memory.c	/^typedef struct block_header {$/;"	s	file:
+block_header_t	src/drivers/memory.c	/^} block_header_t;$/;"	t	typeref:struct:block_header	file:
 bss_clear_done	src/boot.S	/^bss_clear_done:$/;"	l
 bss_clear_loop	src/boot.S	/^bss_clear_loop:$/;"	l
 cpu_halt	src/boot.S	/^cpu_halt:$/;"	l
@@ -63,8 +79,10 @@ current_task	src/drivers/task.c	/^static task_t *current_task = 0;$/;"	v	file:
 delay	src/drivers/uart.c	/^static void delay(unsigned int count) {$/;"	f	file:
 dequeue_ready_task	src/drivers/task.c	/^static task_t *dequeue_ready_task(void) {$/;"	f	file:
 enqueue_task	src/drivers/task.c	/^static void enqueue_task(task_t *task) {$/;"	f	file:
-get_current_task	src/drivers/task.c	/^task_t *get_current_task(void) {$/;"	f
-get_task_pool	src/drivers/task.c	/^task_t *get_task_pool(void) {$/;"	f
+first_free_page	src/drivers/memory.c	/^static unsigned long first_free_page = 0;$/;"	v	file:
+free_list	src/drivers/memory.c	/^static block_header_t *free_list = 0;$/;"	v	file:
+get_current_task	src/drivers/task.c	/^task_t *get_current_task(void) { return current_task; }$/;"	f
+get_task_pool	src/drivers/task.c	/^task_t *get_task_pool(void) { return task_pool; }$/;"	f
 gic_enable_interrupt	src/drivers/gic.c	/^void gic_enable_interrupt(unsigned int int_id) {$/;"	f
 gic_enable_timer_irq	src/drivers/gic.c	/^void gic_enable_timer_irq(void) {$/;"	f
 gic_end_interrupt	src/drivers/gic.c	/^void gic_end_interrupt(unsigned int int_id) {$/;"	f
@@ -72,19 +90,38 @@ gic_get_interrupt	src/drivers/gic.c	/^unsigned int gic_get_interrupt(void) {$/;"
 gic_init	src/drivers/gic.c	/^void gic_init(void) {$/;"	f
 gic_timer_irq_pending	src/drivers/gic.c	/^int gic_timer_irq_pending(void) {$/;"	f
 hang	src/vectors.S	/^hang:$/;"	l
+heap_brk	src/drivers/memory.c	/^static unsigned char *heap_brk = 0;$/;"	v	file:
+heap_end	src/drivers/memory.c	/^static unsigned char *heap_end = 0;$/;"	v	file:
+heap_start	src/drivers/memory.c	/^static unsigned char *heap_start = 0;$/;"	v	file:
 id	include/task.h	/^    unsigned int id;$/;"	m	struct:task
 init_task_trapframe	src/drivers/task.c	/^static void init_task_trapframe(task_t *task, void (*entry_point)(void)) {$/;"	f	file:
 irq_entry	src/vectors.S	/^irq_entry:$/;"	l
 irq_handler_c	src/kernel.c	/^unsigned long irq_handler_c(unsigned long sp) {$/;"	f
+is_page_alloc	src/drivers/memory.c	/^    int is_page_alloc;$/;"	m	struct:block_header	file:
 kernel_main	src/kernel.c	/^void kernel_main(void) {$/;"	f
+kfree	src/drivers/memory.c	/^void kfree(void *ptr) {$/;"	f
+kmalloc	src/drivers/memory.c	/^void *kmalloc(unsigned long size) {$/;"	f
+magic	src/drivers/memory.c	/^    unsigned long magic;$/;"	m	struct:block_header	file:
+memory_get_free_pages	src/drivers/memory.c	/^unsigned long memory_get_free_pages(void)  { return total_pages - used_pages; }$/;"	f
+memory_get_total_pages	src/drivers/memory.c	/^unsigned long memory_get_total_pages(void) { return total_pages; }$/;"	f
+memory_get_used_pages	src/drivers/memory.c	/^unsigned long memory_get_used_pages(void)  { return used_pages; }$/;"	f
+memory_init	src/drivers/memory.c	/^void memory_init(void) {$/;"	f
 name	include/task.h	/^    char name[32];$/;"	m	struct:task
 next	include/task.h	/^    struct task *next;$/;"	m	struct:task	typeref:struct:task::task
+next	src/drivers/memory.c	/^    struct block_header *next;$/;"	m	struct:block_header	typeref:struct:block_header::block_header	file:
 next_task_id	src/drivers/task.c	/^static unsigned int next_task_id = 0;$/;"	v	file:
+page_alloc	src/drivers/memory.c	/^void *page_alloc(void) { return page_alloc_n(1); }$/;"	f
+page_alloc_n	src/drivers/memory.c	/^void *page_alloc_n(unsigned int count) {$/;"	f
+page_bitmap	src/drivers/memory.c	/^static unsigned char *page_bitmap = (unsigned char *)BITMAP_ADDR;$/;"	v	file:
+page_free	src/drivers/memory.c	/^void page_free(void *addr) { page_free_n(addr, 1); }$/;"	f
+page_free_n	src/drivers/memory.c	/^void page_free_n(void *addr, unsigned int count) {$/;"	f
+parse_num	src/kernel.c	/^static unsigned long parse_num(const char *s) {$/;"	f	file:
 process_command	src/kernel.c	/^static void process_command(char *cmd) {$/;"	f	file:
 ready_queue_head	src/drivers/task.c	/^static task_t *ready_queue_head = 0;$/;"	v	file:
 schedule_irq	src/drivers/task.c	/^unsigned long schedule_irq(unsigned long old_sp) {$/;"	f
 scheduler_enabled	src/kernel.c	/^static volatile int scheduler_enabled = 0;$/;"	v	file:
 scheduler_init	src/drivers/task.c	/^void scheduler_init(void) {$/;"	f
+size	src/drivers/memory.c	/^    unsigned long size;$/;"	m	struct:block_header	file:
 sleep_until	include/task.h	/^    unsigned long sleep_until;$/;"	m	struct:task
 sp	include/task.h	/^    unsigned long sp;           \/\/ Saved stack pointer (points to trapframe)$/;"	m	struct:task
 stack	include/task.h	/^    unsigned long stack[1024];  \/\/ 8KB stack per task$/;"	m	struct:task
@@ -92,12 +129,14 @@ state	include/task.h	/^    task_state_t state;$/;"	m	struct:task
 state_name	src/kernel.c	/^static const char *state_name(task_state_t s) {$/;"	f	file:
 strcmp	src/kernel.c	/^static int strcmp(const char *s1, const char *s2) {$/;"	f	file:
 strcpy_local	src/drivers/task.c	/^static void strcpy_local(char *dst, const char *src) {$/;"	f	file:
+strncmp	src/kernel.c	/^static int strncmp(const char *s1, const char *s2, int n) {$/;"	f	file:
 switch_to	src/context.S	/^switch_to:$/;"	l
 task	include/task.h	/^typedef struct task {$/;"	s
 task_counter	src/kernel.c	/^static void task_counter(void) {$/;"	f	file:
 task_create	src/drivers/task.c	/^void task_create(void (*entry_point)(void), const char *name) {$/;"	f
 task_exit	src/drivers/task.c	/^void task_exit(void) {$/;"	f
 task_exit_trampoline	src/drivers/task.c	/^static void task_exit_trampoline(void) {$/;"	f	file:
+task_memtest	src/kernel.c	/^static void task_memtest(void) {$/;"	f	file:
 task_pool	src/drivers/task.c	/^static task_t task_pool[MAX_TASKS];$/;"	v	file:
 task_sleep	src/drivers/task.c	/^void task_sleep(unsigned int ms) {$/;"	f
 task_spinner	src/kernel.c	/^static void task_spinner(void) {$/;"	f	file:
@@ -112,6 +151,7 @@ timer_get_tick_count	src/drivers/timer.c	/^unsigned long timer_get_tick_count(vo
 timer_get_ticks	src/drivers/timer.c	/^unsigned long timer_get_ticks(void) {$/;"	f
 timer_handle_irq	src/drivers/timer.c	/^void timer_handle_irq(void) {$/;"	f
 timer_init	src/drivers/timer.c	/^void timer_init(unsigned int interval_ms) {$/;"	f
+total_pages	src/drivers/memory.c	/^static unsigned long total_pages = MANAGED_PAGES;$/;"	v	file:
 uart_getc	src/drivers/uart.c	/^unsigned char uart_getc(void) {$/;"	f
 uart_getc_nonblock	src/drivers/uart.c	/^int uart_getc_nonblock(void) {$/;"	f
 uart_gets	src/drivers/uart.c	/^void uart_gets(char* buffer, int max_len) {$/;"	f
@@ -121,4 +161,5 @@ uart_put_dec	src/drivers/uart.c	/^void uart_put_dec(unsigned long value) {$/;"	f
 uart_put_hex	src/drivers/uart.c	/^void uart_put_hex(unsigned long value) {$/;"	f
 uart_putc	src/drivers/uart.c	/^void uart_putc(unsigned char c) {$/;"	f
 uart_puts	src/drivers/uart.c	/^void uart_puts(const char* str) {$/;"	f
+used_pages	src/drivers/memory.c	/^static unsigned long used_pages = 0;$/;"	v	file:
 vectors	src/vectors.S	/^vectors:$/;"	l
