@@ -35,8 +35,10 @@ GPPUDCLK0	src/drivers/uart.c	/^#define GPPUDCLK0 /;"	d	file:
 HEADER_SIZE	src/drivers/memory.c	/^#define HEADER_SIZE /;"	d	file:
 HEAP_PAGES	src/drivers/memory.c	/^#define HEAP_PAGES /;"	d	file:
 HEAP_SIZE	src/drivers/memory.c	/^#define HEAP_SIZE /;"	d	file:
+HISTORY_SIZE	src/kernel.c	/^#define HISTORY_SIZE /;"	d	file:
 INC_DIR	Makefile	/^INC_DIR = include$/;"	m
 IRQ_SOURCE_CNTP	src/drivers/gic.c	/^#define IRQ_SOURCE_CNTP /;"	d	file:
+LINE_MAX	src/kernel.c	/^#define LINE_MAX /;"	d	file:
 MANAGED_PAGES	src/drivers/memory.c	/^#define MANAGED_PAGES /;"	d	file:
 MANAGED_SIZE	src/drivers/memory.c	/^#define MANAGED_SIZE /;"	d	file:
 MAX_TASKS	include/task.h	/^#define MAX_TASKS /;"	d
@@ -45,6 +47,7 @@ MMIO_BASE	src/drivers/uart.c	/^#define MMIO_BASE /;"	d	file:
 OBJS	Makefile	/^OBJS = $(BUILD_DIR)\/boot.o \\$/;"	m
 PAGE_SHIFT	include/memory.h	/^#define PAGE_SHIFT /;"	d
 PAGE_SIZE	include/memory.h	/^#define PAGE_SIZE /;"	d
+PAGE_SIZE	include/task.h	/^#define PAGE_SIZE /;"	d
 SRC_DIR	Makefile	/^SRC_DIR = src$/;"	m
 TARGET	Makefile	/^TARGET = kernel8.img$/;"	m
 TASK_BLOCKED	include/task.h	/^    TASK_BLOCKED,$/;"	e	enum:__anon1
@@ -53,7 +56,7 @@ TASK_H	include/task.h	/^#define TASK_H$/;"	d
 TASK_READY	include/task.h	/^    TASK_READY,$/;"	e	enum:__anon1
 TASK_RUNNING	include/task.h	/^    TASK_RUNNING,$/;"	e	enum:__anon1
 TIMER_H	include/timer.h	/^#define TIMER_H$/;"	d
-TRAPFRAME_SIZE	include/task.h	/^#define TRAPFRAME_SIZE /;"	d
+TRAPFRAME_SIZE	src/drivers/task.c	/^#define TRAPFRAME_SIZE /;"	d	file:
 UART0_CR	src/drivers/uart.c	/^#define UART0_CR /;"	d	file:
 UART0_DR	src/drivers/uart.c	/^#define UART0_DR /;"	d	file:
 UART0_FBRD	src/drivers/uart.c	/^#define UART0_FBRD /;"	d	file:
@@ -74,6 +77,12 @@ block_header	src/drivers/memory.c	/^typedef struct block_header {$/;"	s	file:
 block_header_t	src/drivers/memory.c	/^} block_header_t;$/;"	t	typeref:struct:block_header	file:
 bss_clear_done	src/boot.S	/^bss_clear_done:$/;"	l
 bss_clear_loop	src/boot.S	/^bss_clear_loop:$/;"	l
+cmd_help	src/kernel.c	/^static void cmd_help(void) {$/;"	f	file:
+cmd_history_show	src/kernel.c	/^static void cmd_history_show(void) {$/;"	f	file:
+cmd_kill	src/kernel.c	/^static void cmd_kill(const char *arg) {$/;"	f	file:
+cmd_ps	src/kernel.c	/^static void cmd_ps(void) {$/;"	f	file:
+cmd_top	src/kernel.c	/^static void cmd_top(void) {$/;"	f	file:
+commands	src/kernel.c	/^static const char *commands[] = {$/;"	v	file:
 cpu_halt	src/boot.S	/^cpu_halt:$/;"	l
 current_task	src/drivers/task.c	/^static task_t *current_task = 0;$/;"	v	file:
 delay	src/drivers/uart.c	/^static void delay(unsigned int count) {$/;"	f	file:
@@ -81,8 +90,8 @@ dequeue_ready_task	src/drivers/task.c	/^static task_t *dequeue_ready_task(void) 
 enqueue_task	src/drivers/task.c	/^static void enqueue_task(task_t *task) {$/;"	f	file:
 first_free_page	src/drivers/memory.c	/^static unsigned long first_free_page = 0;$/;"	v	file:
 free_list	src/drivers/memory.c	/^static block_header_t *free_list = 0;$/;"	v	file:
-get_current_task	src/drivers/task.c	/^task_t *get_current_task(void) { return current_task; }$/;"	f
-get_task_pool	src/drivers/task.c	/^task_t *get_task_pool(void) { return task_pool; }$/;"	f
+get_current_task	src/drivers/task.c	/^task_t *get_current_task(void) {$/;"	f
+get_task_pool	src/drivers/task.c	/^task_t *get_task_pool(void) {$/;"	f
 gic_enable_interrupt	src/drivers/gic.c	/^void gic_enable_interrupt(unsigned int int_id) {$/;"	f
 gic_enable_timer_irq	src/drivers/gic.c	/^void gic_enable_timer_irq(void) {$/;"	f
 gic_end_interrupt	src/drivers/gic.c	/^void gic_end_interrupt(unsigned int int_id) {$/;"	f
@@ -93,6 +102,11 @@ hang	src/vectors.S	/^hang:$/;"	l
 heap_brk	src/drivers/memory.c	/^static unsigned char *heap_brk = 0;$/;"	v	file:
 heap_end	src/drivers/memory.c	/^static unsigned char *heap_end = 0;$/;"	v	file:
 heap_start	src/drivers/memory.c	/^static unsigned char *heap_start = 0;$/;"	v	file:
+history	src/kernel.c	/^static char history[HISTORY_SIZE][LINE_MAX];$/;"	v	file:
+history_add	src/kernel.c	/^static void history_add(const char *cmd) {$/;"	f	file:
+history_count	src/kernel.c	/^static int history_count = 0;    \/\/ Total commands stored$/;"	v	file:
+history_get	src/kernel.c	/^static const char *history_get(int index) {$/;"	f	file:
+history_write	src/kernel.c	/^static int history_write = 0;    \/\/ Next write position (circular)$/;"	v	file:
 id	include/task.h	/^    unsigned int id;$/;"	m	struct:task
 init_task_trapframe	src/drivers/task.c	/^static void init_task_trapframe(task_t *task, void (*entry_point)(void)) {$/;"	f	file:
 irq_entry	src/vectors.S	/^irq_entry:$/;"	l
@@ -118,24 +132,30 @@ page_free_n	src/drivers/memory.c	/^void page_free_n(void *addr, unsigned int cou
 parse_num	src/kernel.c	/^static unsigned long parse_num(const char *s) {$/;"	f	file:
 process_command	src/kernel.c	/^static void process_command(char *cmd) {$/;"	f	file:
 ready_queue_head	src/drivers/task.c	/^static task_t *ready_queue_head = 0;$/;"	v	file:
+remove_from_queue	src/drivers/task.c	/^static void remove_from_queue(task_t *target) {$/;"	f	file:
 schedule_irq	src/drivers/task.c	/^unsigned long schedule_irq(unsigned long old_sp) {$/;"	f
 scheduler_enabled	src/kernel.c	/^static volatile int scheduler_enabled = 0;$/;"	v	file:
 scheduler_init	src/drivers/task.c	/^void scheduler_init(void) {$/;"	f
+shell_readline	src/kernel.c	/^static void shell_readline(char *buf) {$/;"	f	file:
 size	src/drivers/memory.c	/^    unsigned long size;$/;"	m	struct:block_header	file:
 sleep_until	include/task.h	/^    unsigned long sleep_until;$/;"	m	struct:task
-sp	include/task.h	/^    unsigned long sp;           \/\/ Saved stack pointer (points to trapframe)$/;"	m	struct:task
-stack	include/task.h	/^    unsigned long stack[1024];  \/\/ 8KB stack per task$/;"	m	struct:task
+sp	include/task.h	/^    unsigned long sp;$/;"	m	struct:task
+stack	include/task.h	/^    unsigned long stack[1024];  \/\/ 8KB stack$/;"	m	struct:task
 state	include/task.h	/^    task_state_t state;$/;"	m	struct:task
 state_name	src/kernel.c	/^static const char *state_name(task_state_t s) {$/;"	f	file:
-strcmp	src/kernel.c	/^static int strcmp(const char *s1, const char *s2) {$/;"	f	file:
+str_cpy	src/kernel.c	/^static void str_cpy(char *dst, const char *src) {$/;"	f	file:
+str_eq	src/kernel.c	/^static int str_eq(const char *s1, const char *s2) {$/;"	f	file:
+str_len	src/kernel.c	/^static int str_len(const char *s) {$/;"	f	file:
+str_neq	src/kernel.c	/^static int str_neq(const char *s1, const char *s2, int n) {$/;"	f	file:
 strcpy_local	src/drivers/task.c	/^static void strcpy_local(char *dst, const char *src) {$/;"	f	file:
-strncmp	src/kernel.c	/^static int strncmp(const char *s1, const char *s2, int n) {$/;"	f	file:
 switch_to	src/context.S	/^switch_to:$/;"	l
+tab_complete	src/kernel.c	/^static void tab_complete(char *buf, int *pos) {$/;"	f	file:
 task	include/task.h	/^typedef struct task {$/;"	s
 task_counter	src/kernel.c	/^static void task_counter(void) {$/;"	f	file:
 task_create	src/drivers/task.c	/^void task_create(void (*entry_point)(void), const char *name) {$/;"	f
 task_exit	src/drivers/task.c	/^void task_exit(void) {$/;"	f
 task_exit_trampoline	src/drivers/task.c	/^static void task_exit_trampoline(void) {$/;"	f	file:
+task_kill	src/drivers/task.c	/^int task_kill(unsigned int task_id) {$/;"	f
 task_memtest	src/kernel.c	/^static void task_memtest(void) {$/;"	f	file:
 task_pool	src/drivers/task.c	/^static task_t task_pool[MAX_TASKS];$/;"	v	file:
 task_sleep	src/drivers/task.c	/^void task_sleep(unsigned int ms) {$/;"	f

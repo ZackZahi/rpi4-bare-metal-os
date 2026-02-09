@@ -1,8 +1,22 @@
 // task.c - Preemptive round-robin scheduler (trapframe-based)
+//
+// How it works:
+//   - Timer IRQ fires, vectors.S saves full register state onto the
+//     interrupted task's stack (trapframe), then calls irq_handler_c(sp).
+//   - irq_handler_c calls schedule_irq(sp) which saves the SP into the
+//     current task's TCB, picks the next task, and returns that task's SP.
+//   - vectors.S restores registers from the returned SP and does eret.
+//
+// For NEW tasks, we build a fake trapframe on their stack so that when
+// vectors.S restores from it and does eret, execution starts at the
+// task's entry point.
 
 #include "task.h"
 #include "uart.h"
 #include "timer.h"
+
+// Trapframe size: 34 unsigned longs (x0-x30, ELR, SPSR, padding)
+#define TRAPFRAME_SIZE 34
 
 static task_t task_pool[MAX_TASKS];
 static task_t *current_task = 0;
@@ -23,20 +37,17 @@ static void enqueue_task(task_t *task) {
     t->next = task;
 }
 
-// Find next runnable task. Also wakes up blocked tasks whose sleep expired.
 static task_t *dequeue_ready_task(void) {
-    unsigned long now = timer_get_tick_count();
     task_t *task = ready_queue_head;
     task_t *prev = 0;
 
     while (task) {
-        // Wake up sleeping tasks whose timer has expired
-        if (task->state == TASK_BLOCKED && now >= task->sleep_until) {
+        if (task->state == TASK_BLOCKED &&
+            timer_get_tick_count() >= task->sleep_until) {
             task->state = TASK_READY;
         }
 
         if (task->state == TASK_READY) {
-            // Remove from queue and return
             if (prev)
                 prev->next = task->next;
             else
@@ -49,6 +60,25 @@ static task_t *dequeue_ready_task(void) {
         task = task->next;
     }
     return 0;
+}
+
+// Remove a specific task from the ready queue (used by task_kill)
+static void remove_from_queue(task_t *target) {
+    task_t *task = ready_queue_head;
+    task_t *prev = 0;
+
+    while (task) {
+        if (task == target) {
+            if (prev)
+                prev->next = task->next;
+            else
+                ready_queue_head = task->next;
+            task->next = 0;
+            return;
+        }
+        prev = task;
+        task = task->next;
+    }
 }
 
 // ---- Task exit trampoline ----
@@ -70,13 +100,14 @@ static void init_task_trapframe(task_t *task, void (*entry_point)(void)) {
     for (int i = 0; i < TRAPFRAME_SIZE; i++)
         tf[i] = 0;
 
-    tf[30] = (unsigned long)task_exit_trampoline;   // x30 (LR)
-    tf[31] = (unsigned long)entry_point;             // ELR_EL1
-    tf[32] = 0x5;                                    // SPSR_EL1 = EL1h, IRQs enabled
+    tf[30] = (unsigned long)task_exit_trampoline;  // x30 (LR)
+    tf[31] = (unsigned long)entry_point;           // ELR_EL1
+    tf[32] = 0x5;                                  // SPSR_EL1 = EL1h, IRQs enabled
 
     task->sp = (unsigned long)tf;
 }
 
+// ---- Simple string copy ----
 static void strcpy_local(char *dst, const char *src) {
     while (*src)
         *dst++ = *src++;
@@ -85,8 +116,13 @@ static void strcpy_local(char *dst, const char *src) {
 
 // ---- Public API ----
 
-task_t *get_current_task(void) { return current_task; }
-task_t *get_task_pool(void) { return task_pool; }
+task_t *get_current_task(void) {
+    return current_task;
+}
+
+task_t *get_task_pool(void) {
+    return task_pool;
+}
 
 void scheduler_init(void) {
     for (int i = 0; i < MAX_TASKS; i++) {
@@ -98,6 +134,7 @@ void scheduler_init(void) {
     ready_queue_head = 0;
     next_task_id = 0;
 
+    // Adopt current context as task 0 ("shell")
     task_t *shell = &task_pool[0];
     shell->id = next_task_id++;
     shell->state = TASK_RUNNING;
@@ -137,34 +174,56 @@ void task_create(void (*entry_point)(void), const char *name) {
     asm volatile("msr daifclr, #2");
 }
 
+// Kill a task by ID. Returns 0 on success, -1 if not found.
+// Cannot kill the shell (task 0) or the currently running task via this API.
+int task_kill(unsigned int task_id) {
+    asm volatile("msr daifset, #2");
+
+    for (int i = 0; i < MAX_TASKS; i++) {
+        if (task_pool[i].id == task_id && task_pool[i].state != TASK_DEAD) {
+            // Don't kill the shell
+            if (&task_pool[i] == &task_pool[0]) {
+                asm volatile("msr daifclr, #2");
+                return -1;
+            }
+            // Don't kill self (use task_exit for that)
+            if (&task_pool[i] == current_task) {
+                asm volatile("msr daifclr, #2");
+                return -1;
+            }
+
+            // Remove from ready queue if queued
+            remove_from_queue(&task_pool[i]);
+
+            // Mark dead
+            task_pool[i].state = TASK_DEAD;
+            task_pool[i].next = 0;
+
+            asm volatile("msr daifclr, #2");
+            return 0;
+        }
+    }
+
+    asm volatile("msr daifclr, #2");
+    return -1;
+}
+
 unsigned long schedule_irq(unsigned long old_sp) {
     if (!current_task) return old_sp;
 
     current_task->sp = old_sp;
+
     task_t *prev = current_task;
 
-    // Re-enqueue previous task if still runnable OR blocked (sleeping)
-    // Blocked tasks must stay in queue so dequeue_ready_task can wake them
     if (prev->state == TASK_RUNNING) {
         prev->state = TASK_READY;
         enqueue_task(prev);
-    } else if (prev->state == TASK_BLOCKED) {
-        enqueue_task(prev);
     }
-    // DEAD tasks are not re-enqueued
 
     task_t *next = dequeue_ready_task();
 
     if (!next) {
-        // Nothing ready — keep running prev
-        // If prev was BLOCKED, we still run it (it'll wfi)
-        if (prev->state == TASK_READY)
-            prev->state = TASK_RUNNING;
-        else if (prev->state == TASK_BLOCKED) {
-            // Remove prev from queue (we just added it) and keep running
-            // Actually we need to dequeue it — let's just run it
-            // The task will be in its wfi loop, which is fine
-        }
+        prev->state = TASK_RUNNING;
         current_task = prev;
         return prev->sp;
     }
@@ -181,26 +240,24 @@ void task_yield(void) {
 void task_sleep(unsigned int ms) {
     if (!current_task) return;
 
-    task_t *me = current_task;
-
     asm volatile("msr daifset, #2");
     unsigned long ticks = (ms + 99) / 100;
-    me->sleep_until = timer_get_tick_count() + ticks;
-    me->state = TASK_BLOCKED;
+    current_task->sleep_until = timer_get_tick_count() + ticks;
+    current_task->state = TASK_BLOCKED;
+    // Re-enqueue so dequeue_ready_task can check the sleep timer
+    enqueue_task(current_task);
     asm volatile("msr daifclr, #2");
 
-    // Wait until the scheduler wakes us (sets state to READY then RUNNING)
-    while (me->state == TASK_BLOCKED)
+    // Spin until the scheduler wakes us (sets state back to RUNNING)
+    while (current_task->state == TASK_BLOCKED)
         asm volatile("wfi");
 }
 
 void task_exit(void) {
     if (!current_task) return;
 
-    task_t *me = current_task;
-
     asm volatile("msr daifset, #2");
-    me->state = TASK_DEAD;
+    current_task->state = TASK_DEAD;
     asm volatile("msr daifclr, #2");
 
     while (1)
