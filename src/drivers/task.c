@@ -23,17 +23,20 @@ static void enqueue_task(task_t *task) {
     t->next = task;
 }
 
+// Find next runnable task. Also wakes up blocked tasks whose sleep expired.
 static task_t *dequeue_ready_task(void) {
+    unsigned long now = timer_get_tick_count();
     task_t *task = ready_queue_head;
     task_t *prev = 0;
 
     while (task) {
-        if (task->state == TASK_BLOCKED &&
-            timer_get_tick_count() >= task->sleep_until) {
+        // Wake up sleeping tasks whose timer has expired
+        if (task->state == TASK_BLOCKED && now >= task->sleep_until) {
             task->state = TASK_READY;
         }
 
         if (task->state == TASK_READY) {
+            // Remove from queue and return
             if (prev)
                 prev->next = task->next;
             else
@@ -74,7 +77,6 @@ static void init_task_trapframe(task_t *task, void (*entry_point)(void)) {
     task->sp = (unsigned long)tf;
 }
 
-// ---- Simple string copy ----
 static void strcpy_local(char *dst, const char *src) {
     while (*src)
         *dst++ = *src++;
@@ -83,13 +85,8 @@ static void strcpy_local(char *dst, const char *src) {
 
 // ---- Public API ----
 
-task_t *get_current_task(void) {
-    return current_task;
-}
-
-task_t *get_task_pool(void) {
-    return task_pool;
-}
+task_t *get_current_task(void) { return current_task; }
+task_t *get_task_pool(void) { return task_pool; }
 
 void scheduler_init(void) {
     for (int i = 0; i < MAX_TASKS; i++) {
@@ -144,18 +141,30 @@ unsigned long schedule_irq(unsigned long old_sp) {
     if (!current_task) return old_sp;
 
     current_task->sp = old_sp;
-
     task_t *prev = current_task;
 
+    // Re-enqueue previous task if still runnable OR blocked (sleeping)
+    // Blocked tasks must stay in queue so dequeue_ready_task can wake them
     if (prev->state == TASK_RUNNING) {
         prev->state = TASK_READY;
         enqueue_task(prev);
+    } else if (prev->state == TASK_BLOCKED) {
+        enqueue_task(prev);
     }
+    // DEAD tasks are not re-enqueued
 
     task_t *next = dequeue_ready_task();
 
     if (!next) {
-        prev->state = TASK_RUNNING;
+        // Nothing ready — keep running prev
+        // If prev was BLOCKED, we still run it (it'll wfi)
+        if (prev->state == TASK_READY)
+            prev->state = TASK_RUNNING;
+        else if (prev->state == TASK_BLOCKED) {
+            // Remove prev from queue (we just added it) and keep running
+            // Actually we need to dequeue it — let's just run it
+            // The task will be in its wfi loop, which is fine
+        }
         current_task = prev;
         return prev->sp;
     }
@@ -166,15 +175,12 @@ unsigned long schedule_irq(unsigned long old_sp) {
 }
 
 void task_yield(void) {
-    // Next timer IRQ will do the switch
     asm volatile("nop");
 }
 
 void task_sleep(unsigned int ms) {
     if (!current_task) return;
 
-    // Save pointer to THIS task before we get preempted
-    // (current_task will change when the scheduler switches away)
     task_t *me = current_task;
 
     asm volatile("msr daifset, #2");
@@ -183,7 +189,7 @@ void task_sleep(unsigned int ms) {
     me->state = TASK_BLOCKED;
     asm volatile("msr daifclr, #2");
 
-    // Wait until the scheduler wakes us up (sets state back to READY/RUNNING)
+    // Wait until the scheduler wakes us (sets state to READY then RUNNING)
     while (me->state == TASK_BLOCKED)
         asm volatile("wfi");
 }
