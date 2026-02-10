@@ -6,6 +6,7 @@
 #include "gic.h"
 #include "task.h"
 #include "memory.h"
+#include "mmu.h"
 
 static volatile int scheduler_enabled = 0;
 
@@ -94,7 +95,7 @@ static const char *history_get(int index) {
 
 static const char *commands[] = {
     "help", "time", "info", "clear", "ps", "spawn", "memtest",
-    "mem", "alloc", "pgalloc", "pgfree", "kill", "top", "history",
+    "mem", "alloc", "pgalloc", "pgfree", "kill", "top", "history", "mmu",
     0
 };
 
@@ -374,6 +375,7 @@ static void cmd_help(void) {
     uart_puts("  pgalloc   Allocate a 4KB page\n");
     uart_puts("  pgfree A  Free page at hex address A\n");
     uart_puts("  history   Show command history\n");
+    uart_puts("  mmu       Show MMU/cache configuration\n");
     uart_puts("\nShell features:\n");
     uart_puts("  Up/Down   Browse command history\n");
     uart_puts("  Tab       Auto-complete commands\n");
@@ -542,6 +544,7 @@ static void process_command(char *cmd) {
     if (str_eq(cmd, "ps"))      { cmd_ps(); return; }
     if (str_eq(cmd, "top"))     { cmd_top(); return; }
     if (str_eq(cmd, "history")) { cmd_history_show(); return; }
+    if (str_eq(cmd, "mmu"))     { mmu_dump_config(); return; }
 
     if (str_eq(cmd, "time")) {
         unsigned long ticks = timer_get_tick_count();
@@ -669,6 +672,9 @@ void kernel_main(void) {
 
     uart_puts("Initializing memory...\n");
     memory_init();
+
+    uart_puts("Initializing MMU...\n");
+    mmu_init();
 
     uart_puts("Setting up GIC...\n");
     gic_init();

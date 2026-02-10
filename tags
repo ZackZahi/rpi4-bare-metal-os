@@ -9,9 +9,11 @@ ARM_LOCAL_BASE	src/drivers/gic.c	/^#define ARM_LOCAL_BASE /;"	d	file:
 ASMFLAGS	Makefile	/^ASMFLAGS =$/;"	m
 BITMAP_ADDR	src/drivers/memory.c	/^#define BITMAP_ADDR /;"	d	file:
 BITMAP_SIZE	src/drivers/memory.c	/^#define BITMAP_SIZE /;"	d	file:
+BLOCK_DEVICE	src/drivers/mmu.c	/^#define BLOCK_DEVICE /;"	d	file:
 BLOCK_MAGIC	src/drivers/memory.c	/^#define BLOCK_MAGIC /;"	d	file:
+BLOCK_NORMAL	src/drivers/mmu.c	/^#define BLOCK_NORMAL /;"	d	file:
 BUILD_DIR	Makefile	/^BUILD_DIR = build$/;"	m
-CFLAGS	Makefile	/^CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles \\$/;"	m
+CFLAGS	Makefile	/^CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles -mcpu=cortex-a72 -I$(INC_DIR)$/;"	m
 CNTP_IRQ_ENABLE	src/drivers/gic.c	/^#define CNTP_IRQ_ENABLE /;"	d	file:
 CORE0_IRQ_SOURCE	src/drivers/gic.c	/^#define CORE0_IRQ_SOURCE /;"	d	file:
 CORE0_TIMER_IRQ_CTRL	src/drivers/gic.c	/^#define CORE0_TIMER_IRQ_CTRL /;"	d	file:
@@ -44,11 +46,27 @@ MANAGED_SIZE	src/drivers/memory.c	/^#define MANAGED_SIZE /;"	d	file:
 MAX_TASKS	include/task.h	/^#define MAX_TASKS /;"	d
 MEMORY_H	include/memory.h	/^#define MEMORY_H$/;"	d
 MMIO_BASE	src/drivers/uart.c	/^#define MMIO_BASE /;"	d	file:
+MMU_H	include/mmu.h	/^#define MMU_H$/;"	d
+MT_DEVICE	src/drivers/mmu.c	/^#define MT_DEVICE /;"	d	file:
+MT_NORMAL	src/drivers/mmu.c	/^#define MT_NORMAL /;"	d	file:
 OBJS	Makefile	/^OBJS = $(BUILD_DIR)\/boot.o \\$/;"	m
 PAGE_SHIFT	include/memory.h	/^#define PAGE_SHIFT /;"	d
 PAGE_SIZE	include/memory.h	/^#define PAGE_SIZE /;"	d
 PAGE_SIZE	include/task.h	/^#define PAGE_SIZE /;"	d
+PT_AF	src/drivers/mmu.c	/^#define PT_AF /;"	d	file:
+PT_AP_RO_ALL	src/drivers/mmu.c	/^#define PT_AP_RO_ALL /;"	d	file:
+PT_AP_RO_EL1	src/drivers/mmu.c	/^#define PT_AP_RO_EL1 /;"	d	file:
+PT_AP_RW_ALL	src/drivers/mmu.c	/^#define PT_AP_RW_ALL /;"	d	file:
+PT_AP_RW_EL1	src/drivers/mmu.c	/^#define PT_AP_RW_EL1 /;"	d	file:
+PT_ATTR	src/drivers/mmu.c	/^#define PT_ATTR(/;"	d	file:
+PT_BLOCK	src/drivers/mmu.c	/^#define PT_BLOCK /;"	d	file:
+PT_ISH	src/drivers/mmu.c	/^#define PT_ISH /;"	d	file:
+PT_OSH	src/drivers/mmu.c	/^#define PT_OSH /;"	d	file:
+PT_PAGE	src/drivers/mmu.c	/^#define PT_PAGE /;"	d	file:
+PT_TABLE	src/drivers/mmu.c	/^#define PT_TABLE /;"	d	file:
+PT_VALID	src/drivers/mmu.c	/^#define PT_VALID /;"	d	file:
 SRC_DIR	Makefile	/^SRC_DIR = src$/;"	m
+TABLE_ENTRY	src/drivers/mmu.c	/^#define TABLE_ENTRY /;"	d	file:
 TARGET	Makefile	/^TARGET = kernel8.img$/;"	m
 TASK_BLOCKED	include/task.h	/^    TASK_BLOCKED,$/;"	e	enum:__anon1
 TASK_DEAD	include/task.h	/^    TASK_DEAD$/;"	e	enum:__anon1
@@ -115,11 +133,19 @@ is_page_alloc	src/drivers/memory.c	/^    int is_page_alloc;$/;"	m	struct:block_h
 kernel_main	src/kernel.c	/^void kernel_main(void) {$/;"	f
 kfree	src/drivers/memory.c	/^void kfree(void *ptr) {$/;"	f
 kmalloc	src/drivers/memory.c	/^void *kmalloc(unsigned long size) {$/;"	f
+l0_table	src/drivers/mmu.c	/^static unsigned long l0_table[512] __attribute__((aligned(4096)));$/;"	v	file:
+l1_table	src/drivers/mmu.c	/^static unsigned long l1_table[512] __attribute__((aligned(4096)));$/;"	v	file:
+l2_dev_table	src/drivers/mmu.c	/^static unsigned long l2_dev_table[512] __attribute__((aligned(4096)));$/;"	v	file:
+l2_ram_table	src/drivers/mmu.c	/^static unsigned long l2_ram_table[512] __attribute__((aligned(4096)));$/;"	v	file:
 magic	src/drivers/memory.c	/^    unsigned long magic;$/;"	m	struct:block_header	file:
 memory_get_free_pages	src/drivers/memory.c	/^unsigned long memory_get_free_pages(void)  { return total_pages - used_pages; }$/;"	f
 memory_get_total_pages	src/drivers/memory.c	/^unsigned long memory_get_total_pages(void) { return total_pages; }$/;"	f
 memory_get_used_pages	src/drivers/memory.c	/^unsigned long memory_get_used_pages(void)  { return used_pages; }$/;"	f
 memory_init	src/drivers/memory.c	/^void memory_init(void) {$/;"	f
+mmu_dump_config	src/drivers/mmu.c	/^void mmu_dump_config(void) {$/;"	f
+mmu_enabled	src/drivers/mmu.c	/^static int mmu_enabled = 0;$/;"	v	file:
+mmu_init	src/drivers/mmu.c	/^void mmu_init(void) {$/;"	f
+mmu_is_enabled	src/drivers/mmu.c	/^int mmu_is_enabled(void) {$/;"	f
 name	include/task.h	/^    char name[32];$/;"	m	struct:task
 next	include/task.h	/^    struct task *next;$/;"	m	struct:task	typeref:struct:task::task
 next	src/drivers/memory.c	/^    struct block_header *next;$/;"	m	struct:block_header	typeref:struct:block_header::block_header	file:
