@@ -7,6 +7,7 @@
 #include "task.h"
 #include "memory.h"
 #include "mmu.h"
+#include "fs.h"
 
 static volatile int scheduler_enabled = 0;
 
@@ -93,9 +94,19 @@ static const char *history_get(int index) {
 
 // ========== Shell: Tab Completion ==========
 
+// Print the current shell prompt (used by tab complete, Ctrl+L, top)
+static void print_prompt(void) {
+    char path[FS_PATH_MAX];
+    fs_get_path(fs_get_cwd(), path, FS_PATH_MAX);
+    uart_puts("rpi4:");
+    uart_puts(path);
+    uart_puts("> ");
+}
+
 static const char *commands[] = {
     "help", "time", "info", "clear", "ps", "spawn", "memtest",
     "mem", "alloc", "pgalloc", "pgfree", "kill", "top", "history", "mmu",
+    "ls", "cd", "pwd", "mkdir", "rmdir", "touch", "cat", "write", "rm",
     0
 };
 
@@ -148,7 +159,7 @@ static void tab_complete(char *buf, int *pos) {
             }
         }
         // Reprint prompt and current input
-        uart_puts("rpi4> ");
+        print_prompt();
         for (int i = 0; i < *pos; i++)
             uart_putc(buf[i]);
     }
@@ -217,7 +228,7 @@ static void shell_readline(char *buf) {
         // ---- Ctrl+L (clear screen, reprint prompt) ----
         if (c == 0x0C) {
             uart_puts("\033[2J\033[H");
-            uart_puts("rpi4> ");
+            print_prompt();
             for (int i = 0; i < pos; i++)
                 uart_putc(buf[i]);
             continue;
@@ -361,27 +372,37 @@ static const char *state_name(task_state_t s) {
 
 static void cmd_help(void) {
     uart_puts("Available commands:\n");
-    uart_puts("  help      Show this help message\n");
-    uart_puts("  time      Show current tick count\n");
-    uart_puts("  info      Show system information\n");
-    uart_puts("  clear     Clear screen\n");
-    uart_puts("  ps        List all tasks\n");
-    uart_puts("  spawn     Launch demo tasks (counter + spinner)\n");
-    uart_puts("  kill ID   Terminate a task by ID\n");
-    uart_puts("  top       Show live task monitor (press any key to exit)\n");
-    uart_puts("  memtest   Launch memory test task\n");
-    uart_puts("  mem       Show memory statistics\n");
-    uart_puts("  alloc N   Allocate N bytes\n");
-    uart_puts("  pgalloc   Allocate a 4KB page\n");
-    uart_puts("  pgfree A  Free page at hex address A\n");
-    uart_puts("  history   Show command history\n");
-    uart_puts("  mmu       Show MMU/cache configuration\n");
+    uart_puts("  help          Show this help message\n");
+    uart_puts("  time          Show current tick count\n");
+    uart_puts("  info          Show system information\n");
+    uart_puts("  clear         Clear screen\n");
+    uart_puts("  ps            List all tasks\n");
+    uart_puts("  spawn         Launch demo tasks (counter + spinner)\n");
+    uart_puts("  kill ID       Terminate a task by ID\n");
+    uart_puts("  top           Live task monitor (any key to exit)\n");
+    uart_puts("  memtest       Launch memory test task\n");
+    uart_puts("  mem           Show memory statistics\n");
+    uart_puts("  alloc N       Allocate N bytes\n");
+    uart_puts("  pgalloc       Allocate a 4KB page\n");
+    uart_puts("  pgfree A      Free page at hex address A\n");
+    uart_puts("  mmu           Show MMU/cache configuration\n");
+    uart_puts("  history       Show command history\n");
+    uart_puts("\nFilesystem:\n");
+    uart_puts("  ls [path]     List directory contents\n");
+    uart_puts("  cd [path]     Change directory (cd .. to go up)\n");
+    uart_puts("  pwd           Print working directory\n");
+    uart_puts("  mkdir PATH    Create directory\n");
+    uart_puts("  rmdir PATH    Remove empty directory\n");
+    uart_puts("  touch PATH    Create empty file\n");
+    uart_puts("  cat PATH      Show file contents\n");
+    uart_puts("  write PATH    Write text to file (interactive)\n");
+    uart_puts("  rm PATH       Remove file\n");
     uart_puts("\nShell features:\n");
-    uart_puts("  Up/Down   Browse command history\n");
-    uart_puts("  Tab       Auto-complete commands\n");
-    uart_puts("  Ctrl+C    Cancel current input\n");
-    uart_puts("  Ctrl+U    Clear current line\n");
-    uart_puts("  Ctrl+L    Clear screen\n");
+    uart_puts("  Up/Down       Browse command history\n");
+    uart_puts("  Tab           Auto-complete commands\n");
+    uart_puts("  Ctrl+C        Cancel current input\n");
+    uart_puts("  Ctrl+U        Clear current line\n");
+    uart_puts("  Ctrl+L        Clear screen\n");
 }
 
 static void cmd_ps(void) {
@@ -478,7 +499,6 @@ static void cmd_top(void) {
 
 top_done:
     uart_puts("\033[2J\033[H");  // Clear screen
-    uart_puts("rpi4> ");         // Will be followed by normal prompt
 }
 
 static void cmd_kill(const char *arg) {
@@ -532,6 +552,89 @@ static void cmd_history_show(void) {
             uart_puts(h);
             uart_puts("\n");
         }
+    }
+}
+
+// Skip leading spaces and return pointer to argument
+static const char *skip_arg(const char *cmd, int cmdlen) {
+    const char *p = cmd + cmdlen;
+    while (*p == ' ') p++;
+    return p;
+}
+
+static void cmd_write_interactive(const char *path) {
+    if (!path || path[0] == '\0') {
+        uart_puts("Usage: write <filename>\n");
+        return;
+    }
+
+    // Create file if needed
+    fs_node_t *file = fs_resolve(path);
+    if (file && file->type == FS_DIR) {
+        uart_puts("write: is a directory\n");
+        return;
+    }
+
+    uart_puts("Enter text (Ctrl+D on empty line to finish):\n");
+
+    // Read lines into a buffer
+    char content[FS_MAX_DATA];
+    int total = 0;
+
+    while (total < FS_MAX_DATA - 2) {
+        uart_puts("> ");
+        // Read one line
+        char line[256];
+        int lpos = 0;
+        while (1) {
+            unsigned char c = uart_getc();
+            if (c == 0x04) {  // Ctrl+D
+                if (lpos == 0) {
+                    uart_puts("\n");
+                    goto done_writing;
+                }
+                continue;
+            }
+            if (c == '\r' || c == '\n') {
+                line[lpos] = '\0';
+                uart_puts("\n");
+                break;
+            }
+            if ((c == 0x7F || c == 0x08) && lpos > 0) {
+                lpos--;
+                uart_puts("\b \b");
+                continue;
+            }
+            if (c == 0x03) {  // Ctrl+C — abort
+                uart_puts("^C\n");
+                uart_puts("write: aborted\n");
+                return;
+            }
+            if (c >= 32 && c < 127 && lpos < 255) {
+                line[lpos++] = c;
+                uart_putc(c);
+            }
+        }
+
+        // Append line + newline to content
+        for (int i = 0; line[i] && total < FS_MAX_DATA - 2; i++)
+            content[total++] = line[i];
+        if (total < FS_MAX_DATA - 2)
+            content[total++] = '\n';
+    }
+
+done_writing:
+    content[total] = '\0';
+
+    if (total > 0) {
+        fs_write(path, content);
+        uart_puts("Wrote ");
+        uart_put_dec(total);
+        uart_puts(" bytes to ");
+        uart_puts(path);
+        uart_puts("\n");
+    } else {
+        uart_puts("write: nothing written\n");
     }
 }
 
@@ -654,6 +757,111 @@ static void process_command(char *cmd) {
         return;
     }
 
+    // ---- Filesystem commands ----
+
+    if (str_eq(cmd, "ls")) {
+        fs_ls(0);
+        return;
+    }
+    if (str_neq(cmd, "ls ", 3) == 0) {
+        fs_ls(skip_arg(cmd, 2));
+        return;
+    }
+
+    if (str_eq(cmd, "pwd")) {
+        char path[FS_PATH_MAX];
+        fs_get_path(fs_get_cwd(), path, FS_PATH_MAX);
+        uart_puts(path);
+        uart_puts("\n");
+        return;
+    }
+
+    if (str_eq(cmd, "cd")) {
+        fs_set_cwd(fs_get_root());
+        return;
+    }
+    if (str_neq(cmd, "cd ", 3) == 0) {
+        const char *arg = skip_arg(cmd, 2);
+        if (arg[0] == '\0') {
+            fs_set_cwd(fs_get_root());
+        } else {
+            fs_node_t *dir = fs_resolve(arg);
+            if (!dir) {
+                uart_puts("cd: not found: ");
+                uart_puts(arg);
+                uart_puts("\n");
+            } else if (dir->type != FS_DIR) {
+                uart_puts("cd: not a directory: ");
+                uart_puts(arg);
+                uart_puts("\n");
+            } else {
+                fs_set_cwd(dir);
+            }
+        }
+        return;
+    }
+
+    if (str_neq(cmd, "mkdir ", 6) == 0) {
+        const char *arg = skip_arg(cmd, 5);
+        if (arg[0] == '\0') uart_puts("Usage: mkdir <dirname>\n");
+        else fs_mkdir(arg);
+        return;
+    }
+
+    if (str_neq(cmd, "rmdir ", 6) == 0) {
+        const char *arg = skip_arg(cmd, 5);
+        if (arg[0] == '\0') uart_puts("Usage: rmdir <dirname>\n");
+        else fs_rmdir(arg);
+        return;
+    }
+
+    if (str_neq(cmd, "touch ", 6) == 0) {
+        const char *arg = skip_arg(cmd, 5);
+        if (arg[0] == '\0') uart_puts("Usage: touch <filename>\n");
+        else fs_touch(arg);
+        return;
+    }
+
+    if (str_neq(cmd, "cat ", 4) == 0) {
+        const char *arg = skip_arg(cmd, 3);
+        if (arg[0] == '\0') {
+            uart_puts("Usage: cat <filename>\n");
+            return;
+        }
+        unsigned long size = 0;
+        const char *data = fs_read(arg, &size);
+        if (!data) {
+            fs_node_t *node = fs_resolve(arg);
+            if (node && node->type == FS_DIR) {
+                uart_puts("cat: is a directory\n");
+            } else if (!node) {
+                uart_puts("cat: not found: ");
+                uart_puts(arg);
+                uart_puts("\n");
+            } else {
+                uart_puts("(empty)\n");
+            }
+        } else {
+            uart_puts(data);
+            // Add newline if content doesn't end with one
+            if (size > 0 && data[size - 1] != '\n')
+                uart_puts("\n");
+        }
+        return;
+    }
+
+    if (str_neq(cmd, "write ", 6) == 0) {
+        cmd_write_interactive(skip_arg(cmd, 5));
+        return;
+    }
+
+    if (str_neq(cmd, "rm ", 3) == 0) {
+        const char *arg = skip_arg(cmd, 2);
+        if (arg[0] == '\0') uart_puts("Usage: rm <filename>\n");
+        else fs_rm(arg);
+        return;
+    }
+
     uart_puts("Unknown: ");
     uart_puts(cmd);
     uart_puts("  (try 'help')\n");
@@ -675,6 +883,9 @@ void kernel_main(void) {
 
     uart_puts("Initializing MMU...\n");
     mmu_init();
+
+    uart_puts("Initializing filesystem...\n");
+    fs_init();
 
     uart_puts("Setting up GIC...\n");
     gic_init();
@@ -699,7 +910,7 @@ void kernel_main(void) {
 
     char input_buffer[LINE_MAX];
     while (1) {
-        uart_puts("rpi4> ");
+        print_prompt();
         shell_readline(input_buffer);
         process_command(input_buffer);
     }

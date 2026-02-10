@@ -18,7 +18,8 @@ OBJS = $(BUILD_DIR)/boot.o \
        $(BUILD_DIR)/gic.o \
        $(BUILD_DIR)/task.o \
        $(BUILD_DIR)/memory.o \
-       $(BUILD_DIR)/mmu.o
+       $(BUILD_DIR)/mmu.o \
+       $(BUILD_DIR)/fs.o
 
 TARGET = kernel8.img
 ELF = kernel8.elf
