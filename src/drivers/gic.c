@@ -1,18 +1,8 @@
 // gic.c - GIC-400 + ARM Local Peripherals interrupt controller for RPi4
 //
-// On real RPi4 hardware, the GIC-400 handles interrupt routing.
-// On QEMU's raspi4b, the ARM generic timer interrupt is routed via
-// the BCM2836-style ARM Local Peripherals controller, NOT the GIC.
-//
-// The local peripherals are at physical 0x40000000 on RPi2/3, but
-// on RPi4 they are remapped to 0xFF800000.
-//
-// To get timer interrupts working on QEMU raspi4b, we need to:
-//   1. Enable the timer via ARM system registers (done in timer.c)
-//   2. Unmask CNTP interrupt for core 0 at 0xFF800040
-//   3. The IRQ will then fire through the vector table
-//
-// We still initialise the GIC for completeness (needed on real hw).
+// On QEMU raspi4b, the ARM generic timer interrupt is routed via
+// the BCM2836-style ARM Local Peripherals controller at 0xFF800000.
+// Each core has its own timer IRQ control and IRQ source registers.
 
 #include "gic.h"
 
@@ -34,63 +24,80 @@
 // ---- ARM Local Peripherals (BCM2836-style) ----
 // On RPi4 these are at 0xFF800000 (remapped from 0x40000000)
 #define ARM_LOCAL_BASE          0xFF800000UL
-#define CORE0_TIMER_IRQ_CTRL    ((volatile unsigned int *)(ARM_LOCAL_BASE + 0x40))
-#define CORE0_IRQ_SOURCE        ((volatile unsigned int *)(ARM_LOCAL_BASE + 0x60))
 
-// Bit 1 in CORE0_TIMER_IRQ_CTRL = nCNTPNSIRQ (physical non-secure timer)
-// Bit 0 = nCNTPSIRQ (physical secure timer)
-// Bit 3 = nCNTVIRQ (virtual timer)
-#define CNTP_IRQ_ENABLE         (1 << 1)   // Non-secure physical timer
+// Per-core timer IRQ control: 0x40 + core_id * 4
+#define CORE_TIMER_IRQ_CTRL(n)  ((volatile unsigned int *)(ARM_LOCAL_BASE + 0x40 + (n) * 4))
 
-// Bit in CORE0_IRQ_SOURCE that indicates CNTP fired
+// Per-core IRQ source: 0x60 + core_id * 4
+#define CORE_IRQ_SOURCE(n)      ((volatile unsigned int *)(ARM_LOCAL_BASE + 0x60 + (n) * 4))
+
+// Bit 1 = nCNTPNSIRQ (physical non-secure timer)
+#define CNTP_IRQ_ENABLE         (1 << 1)
 #define IRQ_SOURCE_CNTP         (1 << 1)
 
+// ---- GIC init (core 0, full distributor + CPU interface) ----
+
 void gic_init(void) {
-    // Disable distributor and CPU interface
     *GICD_CTLR = 0;
     *GICC_CTLR = 0;
-
-    // Allow all priority levels
     *GICC_PMR = 0xFF;
-
-    // Enable distributor and CPU interface
     *GICD_CTLR = 1;
     *GICC_CTLR = 1;
 }
 
+// ---- GIC CPU interface init for secondary cores ----
+// Each core has its own banked GICC registers at the same address
+
+void gic_init_core(void) {
+    *GICC_CTLR = 0;
+    *GICC_PMR = 0xFF;
+    *GICC_CTLR = 1;
+}
+
+// ---- Enable interrupt in distributor ----
+
 void gic_enable_interrupt(unsigned int int_id) {
-    // GIC: set priority
     unsigned int reg = int_id / 4;
     unsigned int shift = (int_id % 4) * 8;
+
     volatile unsigned int *prio = GICD_IPRIORITYR + reg;
     unsigned int val = *prio;
     val &= ~(0xFF << shift);
     val |= (0xA0 << shift);
     *prio = val;
 
-    // GIC: target CPU 0
     volatile unsigned int *tgt = GICD_ITARGETSR + reg;
     val = *tgt;
     val &= ~(0xFF << shift);
     val |= (0x01 << shift);
     *tgt = val;
 
-    // GIC: enable the interrupt
     unsigned int en_reg = int_id / 32;
     unsigned int en_bit = int_id % 32;
     GICD_ISENABLER[en_reg] = (1 << en_bit);
 }
 
-// Enable the physical timer interrupt via ARM Local Peripherals
-// This is what actually makes QEMU raspi4b deliver the IRQ
+// ---- Per-core timer IRQ via ARM Local Peripherals ----
+
 void gic_enable_timer_irq(void) {
-    *CORE0_TIMER_IRQ_CTRL = CNTP_IRQ_ENABLE;
+    *CORE_TIMER_IRQ_CTRL(0) = CNTP_IRQ_ENABLE;
 }
 
-// Check if the timer IRQ is pending via the local interrupt source register
-int gic_timer_irq_pending(void) {
-    return (*CORE0_IRQ_SOURCE & IRQ_SOURCE_CNTP) != 0;
+void gic_enable_timer_irq_core(unsigned int core_id) {
+    if (core_id < 4)
+        *CORE_TIMER_IRQ_CTRL(core_id) = CNTP_IRQ_ENABLE;
 }
+
+int gic_timer_irq_pending(void) {
+    return (*CORE_IRQ_SOURCE(0) & IRQ_SOURCE_CNTP) != 0;
+}
+
+int gic_timer_irq_pending_core(unsigned int core_id) {
+    if (core_id >= 4) return 0;
+    return (*CORE_IRQ_SOURCE(core_id) & IRQ_SOURCE_CNTP) != 0;
+}
+
+// ---- GIC interrupt acknowledge / end ----
 
 unsigned int gic_get_interrupt(void) {
     return *GICC_IAR & 0x3FF;

@@ -15,12 +15,13 @@ BLOCK_NORMAL	src/drivers/mmu.c	/^#define BLOCK_NORMAL /;"	d	file:
 BUILD_DIR	Makefile	/^BUILD_DIR = build$/;"	m
 CFLAGS	Makefile	/^CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles -mcpu=cortex-a72 -I$(INC_DIR)$/;"	m
 CNTP_IRQ_ENABLE	src/drivers/gic.c	/^#define CNTP_IRQ_ENABLE /;"	d	file:
-CORE0_IRQ_SOURCE	src/drivers/gic.c	/^#define CORE0_IRQ_SOURCE /;"	d	file:
-CORE0_TIMER_IRQ_CTRL	src/drivers/gic.c	/^#define CORE0_TIMER_IRQ_CTRL /;"	d	file:
+CORE_IRQ_SOURCE	src/drivers/gic.c	/^#define CORE_IRQ_SOURCE(/;"	d	file:
+CORE_STACK_SIZE	src/drivers/smp.c	/^#define CORE_STACK_SIZE /;"	d	file:
+CORE_TIMER_IRQ_CTRL	src/drivers/gic.c	/^#define CORE_TIMER_IRQ_CTRL(/;"	d	file:
 DRIVER_DIR	Makefile	/^DRIVER_DIR = $(SRC_DIR)\/drivers$/;"	m
 ELF	Makefile	/^ELF = kernel8.elf$/;"	m
-FS_DIR	include/fs.h	/^    FS_DIR$/;"	e	enum:__anon2
-FS_FILE	include/fs.h	/^    FS_FILE,$/;"	e	enum:__anon2
+FS_DIR	include/fs.h	/^    FS_DIR$/;"	e	enum:__anon4
+FS_FILE	include/fs.h	/^    FS_FILE,$/;"	e	enum:__anon4
 FS_H	include/fs.h	/^#define FS_H$/;"	d
 FS_MAX_DATA	include/fs.h	/^#define FS_MAX_DATA /;"	d
 FS_MAX_NODES	include/fs.h	/^#define FS_MAX_NODES /;"	d
@@ -56,10 +57,10 @@ MMIO_BASE	src/drivers/uart.c	/^#define MMIO_BASE /;"	d	file:
 MMU_H	include/mmu.h	/^#define MMU_H$/;"	d
 MT_DEVICE	src/drivers/mmu.c	/^#define MT_DEVICE /;"	d	file:
 MT_NORMAL	src/drivers/mmu.c	/^#define MT_NORMAL /;"	d	file:
+NUM_CORES	include/smp.h	/^#define NUM_CORES /;"	d
 OBJS	Makefile	/^OBJS = $(BUILD_DIR)\/boot.o \\$/;"	m
 PAGE_SHIFT	include/memory.h	/^#define PAGE_SHIFT /;"	d
 PAGE_SIZE	include/memory.h	/^#define PAGE_SIZE /;"	d
-PAGE_SIZE	include/task.h	/^#define PAGE_SIZE /;"	d
 PT_AF	src/drivers/mmu.c	/^#define PT_AF /;"	d	file:
 PT_AP_RO_ALL	src/drivers/mmu.c	/^#define PT_AP_RO_ALL /;"	d	file:
 PT_AP_RO_EL1	src/drivers/mmu.c	/^#define PT_AP_RO_EL1 /;"	d	file:
@@ -72,6 +73,8 @@ PT_OSH	src/drivers/mmu.c	/^#define PT_OSH /;"	d	file:
 PT_PAGE	src/drivers/mmu.c	/^#define PT_PAGE /;"	d	file:
 PT_TABLE	src/drivers/mmu.c	/^#define PT_TABLE /;"	d	file:
 PT_VALID	src/drivers/mmu.c	/^#define PT_VALID /;"	d	file:
+SMP_H	include/smp.h	/^#define SMP_H$/;"	d
+SPINLOCK_INIT	include/smp.h	/^#define SPINLOCK_INIT /;"	d
 SRC_DIR	Makefile	/^SRC_DIR = src$/;"	m
 TABLE_ENTRY	src/drivers/mmu.c	/^#define TABLE_ENTRY /;"	d	file:
 TARGET	Makefile	/^TARGET = kernel8.img$/;"	m
@@ -112,12 +115,16 @@ cmd_ps	src/kernel.c	/^static void cmd_ps(void) {$/;"	f	file:
 cmd_top	src/kernel.c	/^static void cmd_top(void) {$/;"	f	file:
 cmd_write_interactive	src/kernel.c	/^static void cmd_write_interactive(const char *path) {$/;"	f	file:
 commands	src/kernel.c	/^static const char *commands[] = {$/;"	v	file:
+core_info_t	include/smp.h	/^} core_info_t;$/;"	t	typeref:struct:__anon3
+core_stacks	src/drivers/smp.c	/^static unsigned char core_stacks[3][CORE_STACK_SIZE] __attribute__((aligned(16)));$/;"	v	file:
+cores	src/drivers/smp.c	/^static core_info_t cores[NUM_CORES];$/;"	v	file:
 cpu_halt	src/boot.S	/^cpu_halt:$/;"	l
 current_task	src/drivers/task.c	/^static task_t *current_task = 0;$/;"	v	file:
 cwd	src/drivers/fs.c	/^static fs_node_t *cwd = 0;$/;"	v	file:
 data	include/fs.h	/^    char *data;$/;"	m	struct:fs_node
 delay	src/drivers/uart.c	/^static void delay(unsigned int count) {$/;"	f	file:
 dequeue_ready_task	src/drivers/task.c	/^static task_t *dequeue_ready_task(void) {$/;"	f	file:
+el1_setup	src/smp_entry.S	/^el1_setup:$/;"	l
 enqueue_task	src/drivers/task.c	/^static void enqueue_task(task_t *task) {$/;"	f	file:
 find_child	src/drivers/fs.c	/^static fs_node_t *find_child(fs_node_t *dir, const char *name) {$/;"	f	file:
 first_free_page	src/drivers/memory.c	/^static unsigned long first_free_page = 0;$/;"	v	file:
@@ -131,7 +138,7 @@ fs_ls	src/drivers/fs.c	/^void fs_ls(const char *path) {$/;"	f
 fs_mkdir	src/drivers/fs.c	/^fs_node_t *fs_mkdir(const char *path) {$/;"	f
 fs_node	include/fs.h	/^typedef struct fs_node {$/;"	s
 fs_node_t	include/fs.h	/^} fs_node_t;$/;"	t	typeref:struct:fs_node
-fs_node_type_t	include/fs.h	/^} fs_node_type_t;$/;"	t	typeref:enum:__anon2
+fs_node_type_t	include/fs.h	/^} fs_node_type_t;$/;"	t	typeref:enum:__anon4
 fs_read	src/drivers/fs.c	/^const char *fs_read(const char *path, unsigned long *size) {$/;"	f
 fs_resolve	src/drivers/fs.c	/^fs_node_t *fs_resolve(const char *path) {$/;"	f
 fs_rm	src/drivers/fs.c	/^int fs_rm(const char *path) {$/;"	f
@@ -147,10 +154,14 @@ get_current_task	src/drivers/task.c	/^task_t *get_current_task(void) {$/;"	f
 get_task_pool	src/drivers/task.c	/^task_t *get_task_pool(void) {$/;"	f
 gic_enable_interrupt	src/drivers/gic.c	/^void gic_enable_interrupt(unsigned int int_id) {$/;"	f
 gic_enable_timer_irq	src/drivers/gic.c	/^void gic_enable_timer_irq(void) {$/;"	f
+gic_enable_timer_irq_core	src/drivers/gic.c	/^void gic_enable_timer_irq_core(unsigned int core_id) {$/;"	f
 gic_end_interrupt	src/drivers/gic.c	/^void gic_end_interrupt(unsigned int int_id) {$/;"	f
 gic_get_interrupt	src/drivers/gic.c	/^unsigned int gic_get_interrupt(void) {$/;"	f
 gic_init	src/drivers/gic.c	/^void gic_init(void) {$/;"	f
+gic_init_core	src/drivers/gic.c	/^void gic_init_core(void) {$/;"	f
 gic_timer_irq_pending	src/drivers/gic.c	/^int gic_timer_irq_pending(void) {$/;"	f
+gic_timer_irq_pending_core	src/drivers/gic.c	/^int gic_timer_irq_pending_core(unsigned int core_id) {$/;"	f
+halt_secondary	src/smp_entry.S	/^halt_secondary:$/;"	l
 hang	src/vectors.S	/^hang:$/;"	l
 heap_brk	src/drivers/memory.c	/^static unsigned char *heap_brk = 0;$/;"	v	file:
 heap_end	src/drivers/memory.c	/^static unsigned char *heap_end = 0;$/;"	v	file:
@@ -172,6 +183,7 @@ l0_table	src/drivers/mmu.c	/^static unsigned long l0_table[512] __attribute__((a
 l1_table	src/drivers/mmu.c	/^static unsigned long l1_table[512] __attribute__((aligned(4096)));$/;"	v	file:
 l2_dev_table	src/drivers/mmu.c	/^static unsigned long l2_dev_table[512] __attribute__((aligned(4096)));$/;"	v	file:
 l2_ram_table	src/drivers/mmu.c	/^static unsigned long l2_ram_table[512] __attribute__((aligned(4096)));$/;"	v	file:
+lock	include/smp.h	/^    volatile unsigned int lock;$/;"	m	struct:__anon2
 magic	src/drivers/memory.c	/^    unsigned long magic;$/;"	m	struct:block_header	file:
 memory_get_free_pages	src/drivers/memory.c	/^unsigned long memory_get_free_pages(void)  { return total_pages - used_pages; }$/;"	f
 memory_get_total_pages	src/drivers/memory.c	/^unsigned long memory_get_total_pages(void) { return total_pages; }$/;"	f
@@ -190,6 +202,7 @@ next_sibling	include/fs.h	/^    struct fs_node *next_sibling;$/;"	m	struct:fs_no
 next_task_id	src/drivers/task.c	/^static unsigned int next_task_id = 0;$/;"	v	file:
 node_pool	src/drivers/fs.c	/^static fs_node_t node_pool[FS_MAX_NODES];$/;"	v	file:
 nodes_used	src/drivers/fs.c	/^static int nodes_used = 0;$/;"	v	file:
+online	include/smp.h	/^    volatile unsigned int online;$/;"	m	struct:__anon3
 page_alloc	src/drivers/memory.c	/^void *page_alloc(void) { return page_alloc_n(1); }$/;"	f
 page_alloc_n	src/drivers/memory.c	/^void *page_alloc_n(unsigned int count) {$/;"	f
 page_bitmap	src/drivers/memory.c	/^static unsigned char *page_bitmap = (unsigned char *)BITMAP_ADDR;$/;"	v	file:
@@ -207,12 +220,25 @@ root	src/drivers/fs.c	/^static fs_node_t *root = 0;$/;"	v	file:
 schedule_irq	src/drivers/task.c	/^unsigned long schedule_irq(unsigned long old_sp) {$/;"	f
 scheduler_enabled	src/kernel.c	/^static volatile int scheduler_enabled = 0;$/;"	v	file:
 scheduler_init	src/drivers/task.c	/^void scheduler_init(void) {$/;"	f
+scheduler_lock	src/drivers/smp.c	/^spinlock_t scheduler_lock = SPINLOCK_INIT;$/;"	v
+secondary_core_main	src/drivers/smp.c	/^void secondary_core_main(unsigned int core_id) {$/;"	f
+secondary_entry	src/smp_entry.S	/^secondary_entry:$/;"	l
 shell_readline	src/kernel.c	/^static void shell_readline(char *buf) {$/;"	f	file:
 size	include/fs.h	/^    unsigned long size;$/;"	m	struct:fs_node
 size	src/drivers/memory.c	/^    unsigned long size;$/;"	m	struct:block_header	file:
 skip_arg	src/kernel.c	/^static const char *skip_arg(const char *cmd, int cmdlen) {$/;"	f	file:
 sleep_until	include/task.h	/^    unsigned long sleep_until;$/;"	m	struct:task
+smp_core_id	include/smp.h	/^static inline unsigned int smp_core_id(void) {$/;"	f
+smp_get_core_info	src/drivers/smp.c	/^core_info_t *smp_get_core_info(unsigned int core_id) {$/;"	f
+smp_init	src/drivers/smp.c	/^void smp_init(void) {$/;"	f
+smp_shared_mair	src/drivers/smp.c	/^unsigned long smp_shared_mair;$/;"	v
+smp_shared_tcr	src/drivers/smp.c	/^unsigned long smp_shared_tcr;$/;"	v
+smp_shared_ttbr0	src/drivers/smp.c	/^unsigned long smp_shared_ttbr0;$/;"	v
+smp_stacks	src/drivers/smp.c	/^unsigned long smp_stacks[NUM_CORES];$/;"	v
 sp	include/task.h	/^    unsigned long sp;$/;"	m	struct:task
+spin_lock	src/drivers/smp.c	/^void spin_lock(spinlock_t *lk) {$/;"	f
+spin_unlock	src/drivers/smp.c	/^void spin_unlock(spinlock_t *lk) {$/;"	f
+spinlock_t	include/smp.h	/^} spinlock_t;$/;"	t	typeref:struct:__anon2
 stack	include/task.h	/^    unsigned long stack[1024];  \/\/ 8KB stack$/;"	m	struct:task
 state	include/task.h	/^    task_state_t state;$/;"	m	struct:task
 state_name	src/kernel.c	/^static const char *state_name(task_state_t s) {$/;"	f	file:
@@ -236,7 +262,9 @@ task_spinner	src/kernel.c	/^static void task_spinner(void) {$/;"	f	file:
 task_state_t	include/task.h	/^} task_state_t;$/;"	t	typeref:enum:__anon1
 task_t	include/task.h	/^} task_t;$/;"	t	typeref:struct:task
 task_yield	src/drivers/task.c	/^void task_yield(void) {$/;"	f
+tasks_run	include/smp.h	/^    volatile unsigned long tasks_run;$/;"	m	struct:__anon3
 tick_count	src/drivers/timer.c	/^static volatile unsigned long tick_count = 0;$/;"	v	file:
+ticks	include/smp.h	/^    volatile unsigned long ticks;$/;"	m	struct:__anon3
 timer_delay_ms	src/drivers/timer.c	/^void timer_delay_ms(unsigned int ms) {$/;"	f
 timer_freq	src/drivers/timer.c	/^static unsigned long timer_freq = 0;$/;"	v	file:
 timer_get_frequency	src/drivers/timer.c	/^unsigned long timer_get_frequency(void) {$/;"	f

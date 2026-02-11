@@ -4,7 +4,6 @@
 #define TASK_H
 
 #define MAX_TASKS 8
-#define PAGE_SIZE 4096
 
 typedef enum {
     TASK_READY,

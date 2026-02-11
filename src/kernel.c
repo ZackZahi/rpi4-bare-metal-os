@@ -8,20 +8,28 @@
 #include "memory.h"
 #include "mmu.h"
 #include "fs.h"
+#include "smp.h"
 
 static volatile int scheduler_enabled = 0;
 
 // ========== IRQ Handler ==========
 
 unsigned long irq_handler_c(unsigned long sp) {
+    unsigned int core = smp_core_id();
     unsigned long ctl;
     asm volatile("mrs %0, cntp_ctl_el0" : "=r"(ctl));
 
     if (ctl & 0x4) {
         timer_handle_irq();
 
+        // Track per-core ticks
+        core_info_t *ci = smp_get_core_info(core);
+        ci->ticks++;
+
         if (scheduler_enabled) {
+            spin_lock(&scheduler_lock);
             sp = schedule_irq(sp);
+            spin_unlock(&scheduler_lock);
         }
     }
 
@@ -106,7 +114,7 @@ static void print_prompt(void) {
 static const char *commands[] = {
     "help", "time", "info", "clear", "ps", "spawn", "memtest",
     "mem", "alloc", "pgalloc", "pgfree", "kill", "top", "history", "mmu",
-    "ls", "cd", "pwd", "mkdir", "rmdir", "touch", "cat", "write", "rm",
+    "ls", "cd", "pwd", "mkdir", "rmdir", "touch", "cat", "write", "rm", "cpus",
     0
 };
 
@@ -386,6 +394,7 @@ static void cmd_help(void) {
     uart_puts("  pgalloc       Allocate a 4KB page\n");
     uart_puts("  pgfree A      Free page at hex address A\n");
     uart_puts("  mmu           Show MMU/cache configuration\n");
+    uart_puts("  cpus          Show per-core status\n");
     uart_puts("  history       Show command history\n");
     uart_puts("\nFilesystem:\n");
     uart_puts("  ls [path]     List directory contents\n");
@@ -649,6 +658,23 @@ static void process_command(char *cmd) {
     if (str_eq(cmd, "history")) { cmd_history_show(); return; }
     if (str_eq(cmd, "mmu"))     { mmu_dump_config(); return; }
 
+    if (str_eq(cmd, "cpus")) {
+        uart_puts("CORE  STATUS   TICKS\n");
+        uart_puts("----  ------   -----\n");
+        for (int i = 0; i < NUM_CORES; i++) {
+            core_info_t *ci = smp_get_core_info(i);
+            uart_puts("  ");
+            uart_put_dec(i);
+            uart_puts("    ");
+            if (ci->online) uart_puts("online   ");
+            else            uart_puts("offline  ");
+            uart_put_dec(ci->ticks);
+            if ((unsigned int)i == smp_core_id()) uart_puts("  <-- you");
+            uart_puts("\n");
+        }
+        return;
+    }
+
     if (str_eq(cmd, "time")) {
         unsigned long ticks = timer_get_tick_count();
         uart_puts("Uptime: ");
@@ -661,7 +687,12 @@ static void process_command(char *cmd) {
 
     if (str_eq(cmd, "info")) {
         uart_puts("Raspberry Pi 4 Bare Metal OS\n");
-        uart_puts("CPU: ARM Cortex-A72 (ARMv8-A)\n");
+        uart_puts("CPU: ARM Cortex-A72 (ARMv8-A) x ");
+        int online = 0;
+        for (int i = 0; i < NUM_CORES; i++)
+            if (smp_get_core_info(i)->online) online++;
+        uart_put_dec(online);
+        uart_puts(" cores\n");
         uart_puts("Timer: ");
         uart_put_dec(timer_get_frequency());
         uart_puts(" Hz\n");
@@ -901,6 +932,9 @@ void kernel_main(void) {
     uart_puts("Scheduler init...\n");
     scheduler_init();
     scheduler_enabled = 1;
+
+    uart_puts("Waking secondary cores...\n");
+    smp_init();
 
     uart_puts("Enabling IRQs...\n");
     asm volatile("msr daifclr, #2");

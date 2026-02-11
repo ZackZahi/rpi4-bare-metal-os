@@ -19,7 +19,9 @@ OBJS = $(BUILD_DIR)/boot.o \
        $(BUILD_DIR)/task.o \
        $(BUILD_DIR)/memory.o \
        $(BUILD_DIR)/mmu.o \
-       $(BUILD_DIR)/fs.o
+       $(BUILD_DIR)/fs.o \
+       $(BUILD_DIR)/smp.o \
+       $(BUILD_DIR)/smp_entry.o
 
 TARGET = kernel8.img
 ELF = kernel8.elf
@@ -47,12 +49,14 @@ $(TARGET): $(ELF)
 run: $(TARGET)
 	qemu-system-aarch64 \
 		-M raspi4b \
+		-smp 4 \
 		-kernel $(TARGET) \
 		-serial stdio
 
 debug: $(TARGET)
 	qemu-system-aarch64 \
 		-M raspi4b \
+		-smp 4 \
 		-kernel $(TARGET) \
 		-serial stdio \
 		-S -s
