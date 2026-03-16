@@ -113,6 +113,11 @@ void mmu_init(void) {
     uart_put_hex((unsigned long)l0_table);
     uart_puts("\n");
 
+    // Compiler barrier: force all page table stores to complete before
+    // any system register writes. GCC -O2 can sink stores to static
+    // arrays past asm volatile unless we emit a "memory" clobber here.
+    asm volatile("" ::: "memory");
+
     // ---- Configure MAIR_EL1 (Memory Attribute Indirection Register) ----
     // Attr0 = 0x00: Device-nGnRnE
     // Attr1 = 0xFF: Normal, Write-Back, Read-Allocate, Write-Allocate (inner+outer)
@@ -143,16 +148,16 @@ void mmu_init(void) {
 
     // ---- Set TTBR0_EL1 to our L0 table ----
     asm volatile("msr ttbr0_el1, %0" :: "r"((unsigned long)l0_table));
-    // Clear TTBR1 (not used)
+    // Clear TTBR1 (not used, EPD1=1 disables its walks)
     asm volatile("msr ttbr1_el1, %0" :: "r"(0UL));
 
-    // Ensure all table writes are visible before enabling MMU
-    asm volatile("dsb ish");
+    // Hardware + compiler barrier: ensure all writes are visible before TLB ops
+    asm volatile("dsb ish" ::: "memory");
     asm volatile("isb");
 
     // Invalidate all TLB entries
     asm volatile("tlbi vmalle1is");
-    asm volatile("dsb ish");
+    asm volatile("dsb ish" ::: "memory");
     asm volatile("isb");
 
     uart_puts("  Enabling MMU...\n");
@@ -170,11 +175,8 @@ void mmu_init(void) {
         "isb\n"
         "msr sctlr_el1, %0\n"
         "isb\n"
-        :: "r"(sctlr)
+        :: "r"(sctlr) : "memory"
     );
-
-    // Barrier to ensure MMU is fully active
-    asm volatile("isb");
 
     mmu_enabled = 1;
     uart_puts("  MMU enabled! Identity-mapped with caches on.\n");
