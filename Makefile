@@ -21,7 +21,9 @@ OBJS = $(BUILD_DIR)/boot.o \
        $(BUILD_DIR)/mmu.o \
        $(BUILD_DIR)/fs.o \
        $(BUILD_DIR)/smp.o \
-       $(BUILD_DIR)/smp_entry.o
+       $(BUILD_DIR)/smp_entry.o \
+       $(BUILD_DIR)/syscall.o \
+       $(BUILD_DIR)/syscall_stubs.o
 
 TARGET = kernel8.img
 ELF = kernel8.elf

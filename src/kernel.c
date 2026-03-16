@@ -9,6 +9,7 @@
 #include "mmu.h"
 #include "fs.h"
 #include "smp.h"
+#include "syscall.h"
 
 static volatile int scheduler_enabled = 0;
 
@@ -305,29 +306,60 @@ static void shell_readline(char *buf) {
     }
 }
 
-// ========== Demo Tasks ==========
+// ========== Demo Tasks (EL0 user mode — use syscalls) ==========
+
+// Simple strlen for user tasks
+static unsigned long ustrlen(const char *s) {
+    unsigned long n = 0;
+    while (*s++) n++;
+    return n;
+}
+
+// User-mode print helper
+static void uprint(const char *s) {
+    sys_write(s, ustrlen(s));
+}
+
+// User-mode print decimal
+static void uprint_dec(unsigned long val) {
+    char buf[20];
+    int i = 0;
+    if (val == 0) { buf[i++] = '0'; }
+    else {
+        while (val > 0) { buf[i++] = '0' + (val % 10); val /= 10; }
+    }
+    // Reverse
+    char out[20];
+    for (int j = 0; j < i; j++) out[j] = buf[i - 1 - j];
+    out[i] = '\0';
+    sys_write(out, i);
+}
 
 static void task_counter(void) {
     for (int i = 1; i <= 5; i++) {
-        uart_puts("[counter] ");
-        uart_put_dec(i);
-        uart_puts("/5\n");
-        task_sleep(1000);
+        uprint("[counter] ");
+        uprint_dec(i);
+        uprint("/5\n");
+        sys_sleep(1000);
     }
-    uart_puts("[counter] finished\n");
+    uprint("[counter] finished\n");
+    sys_exit();
 }
 
 static void task_spinner(void) {
     const char spin[] = "|/-\\";
     for (int i = 0; i < 20; i++) {
-        uart_puts("[spinner] ");
-        uart_putc(spin[i % 4]);
-        uart_puts("\n");
-        task_sleep(500);
+        uprint("[spinner] ");
+        char c[2] = { spin[i % 4], '\0' };
+        sys_write(c, 1);
+        uprint("\n");
+        sys_sleep(500);
     }
-    uart_puts("[spinner] finished\n");
+    uprint("[spinner] finished\n");
+    sys_exit();
 }
 
+// memtest stays as EL1 kernel task (needs kmalloc/page_alloc)
 static void task_memtest(void) {
     uart_puts("[memtest] Allocating buffers...\n");
 
@@ -416,8 +448,8 @@ static void cmd_help(void) {
 
 static void cmd_ps(void) {
     task_t *pool = get_task_pool();
-    uart_puts("ID  NAME            STATE\n");
-    uart_puts("--  ----            -----\n");
+    uart_puts("ID  NAME            MODE  STATE\n");
+    uart_puts("--  ----            ----  -----\n");
     for (int i = 0; i < MAX_TASKS; i++) {
         if (pool[i].state == TASK_DEAD && pool[i].name[0] == '\0') continue;
         if (pool[i].state == TASK_DEAD && i != 0) continue;
@@ -427,6 +459,7 @@ static void cmd_ps(void) {
         uart_puts(pool[i].name);
         int len = str_len(pool[i].name);
         for (int j = len; j < 16; j++) uart_putc(' ');
+        uart_puts(pool[i].is_user ? "EL0   " : "EL1   ");
         uart_puts(state_name(pool[i].state));
         if (&pool[i] == get_current_task()) uart_puts(" <-- current");
         uart_puts("\n");
@@ -709,15 +742,15 @@ static void process_command(char *cmd) {
     }
 
     if (str_eq(cmd, "spawn")) {
-        uart_puts("Spawning 'counter' and 'spinner'...\n");
+        uart_puts("Spawning user-mode tasks: 'counter' and 'spinner'...\n");
         task_create(task_counter, "counter");
         task_create(task_spinner, "spinner");
         return;
     }
 
     if (str_eq(cmd, "memtest")) {
-        uart_puts("Spawning 'memtest'...\n");
-        task_create(task_memtest, "memtest");
+        uart_puts("Spawning kernel-mode 'memtest'...\n");
+        task_create_kernel(task_memtest, "memtest");
         return;
     }
 

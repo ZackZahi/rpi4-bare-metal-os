@@ -59,7 +59,7 @@
 
 // Convenience macros for block descriptors
 #define BLOCK_DEVICE    (PT_VALID | PT_BLOCK | PT_AF | PT_ATTR(MT_DEVICE) | PT_OSH | PT_AP_RW_EL1)
-#define BLOCK_NORMAL    (PT_VALID | PT_BLOCK | PT_AF | PT_ATTR(MT_NORMAL) | PT_ISH | PT_AP_RW_EL1)
+#define BLOCK_NORMAL    (PT_VALID | PT_BLOCK | PT_AF | PT_ATTR(MT_NORMAL) | PT_ISH | PT_AP_RW_ALL)
 #define TABLE_ENTRY     (PT_VALID | PT_TABLE)
 
 // ---- Page tables (16KB-aligned, in BSS) ----
@@ -146,20 +146,30 @@ void mmu_init(void) {
     asm volatile("dsb ish");
     asm volatile("isb");
 
+    // Invalidate all TLB entries
+    asm volatile("tlbi vmalle1is");
+    asm volatile("dsb ish");
+    asm volatile("isb");
+
     uart_puts("  Enabling MMU...\n");
 
     // ---- Enable MMU via SCTLR_EL1 ----
-    // Bit 0: M   = MMU enable
-    // Bit 2: C   = Data cache enable
-    // Bit 12: I  = Instruction cache enable
-    // Bit 26: nTLSMD = no trap on load/store multiple to device (set to 1)
-    // Leave other bits at their reset values
     unsigned long sctlr;
     asm volatile("mrs %0, sctlr_el1" : "=r"(sctlr));
     sctlr |= (1UL << 0);     // M = MMU on
     sctlr |= (1UL << 2);     // C = data cache on
     sctlr |= (1UL << 12);    // I = instruction cache on
-    asm volatile("msr sctlr_el1, %0" :: "r"(sctlr));
+    sctlr &= ~(1UL << 19);   // WXN = 0
+    sctlr &= ~(1UL << 23);   // SPAN = 0 (don't auto-set PAN)
+    sctlr &= ~(1UL << 22);   // EIS = 0
+    asm volatile(
+        "ic  iallu\n"         // Invalidate all instruction caches
+        "dsb ish\n"
+        "isb\n"
+        "msr sctlr_el1, %0\n"
+        "isb\n"
+        :: "r"(sctlr)
+    );
 
     // Barrier to ensure MMU is fully active
     asm volatile("isb");
