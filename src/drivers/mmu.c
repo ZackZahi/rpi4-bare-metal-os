@@ -125,8 +125,10 @@ void mmu_init(void) {
     // IRGN0 = 01 → Normal, inner write-back write-allocate cacheable
     // ORGN0 = 01 → Normal, outer write-back write-allocate cacheable
     // SH0 = 11   → Inner shareable
-    // TG0 = 00   → 4KB granule
-    // T1SZ = 16  → (same for TTBR1, though we don't use it)
+    // TG0 = 00   → 4KB granule for TTBR0
+    // EPD1 = 1   → Disable TTBR1 table walks (we don't use upper VA range)
+    // T1SZ = 16  → (unused since EPD1=1)
+    // TG1 = 10   → 4KB granule for TTBR1 (must be valid even if EPD1=1)
     // IPS = 010  → 40-bit physical address space (1TB)
     unsigned long tcr = (16UL << 0)   |  // T0SZ = 16
                         (1UL  << 8)   |  // IRGN0 = write-back
@@ -134,6 +136,8 @@ void mmu_init(void) {
                         (3UL  << 12)  |  // SH0 = inner shareable
                         (0UL  << 14)  |  // TG0 = 4KB
                         (16UL << 16)  |  // T1SZ = 16
+                        (1UL  << 23)  |  // EPD1 = disable TTBR1 walks
+                        (2UL  << 30)  |  // TG1 = 4KB (valid granule)
                         (2UL  << 32);    // IPS = 40-bit PA
     asm volatile("msr tcr_el1, %0" :: "r"(tcr));
 
@@ -159,9 +163,7 @@ void mmu_init(void) {
     sctlr |= (1UL << 0);     // M = MMU on
     sctlr |= (1UL << 2);     // C = data cache on
     sctlr |= (1UL << 12);    // I = instruction cache on
-    sctlr &= ~(1UL << 19);   // WXN = 0
-    sctlr &= ~(1UL << 23);   // SPAN = 0 (don't auto-set PAN)
-    sctlr &= ~(1UL << 22);   // EIS = 0
+    // Note: do NOT clear bits 22/23 — they are RES1 on ARMv8.0/Cortex-A72
     asm volatile(
         "ic  iallu\n"         // Invalidate all instruction caches
         "dsb ish\n"
