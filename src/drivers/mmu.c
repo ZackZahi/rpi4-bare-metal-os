@@ -13,17 +13,18 @@
 //     0xFF800000 : ARM Local peripherals (timer IRQ routing)
 //     0xFF840000 : GIC-400
 //
-// Page table structure (4KB granule, 48-bit VA):
-//   L0: 512 entries, each covers 512GB — we use entry 0
+// Page table structure (4KB granule, 39-bit VA, T0SZ=25):
 //   L1: 512 entries, each covers 1GB  — we use entries 0 and 3
 //   L2: 512 entries, each covers 2MB  — block descriptors
 //
+// Using T0SZ=25 (39-bit VA, 3-level walk: L1→L2→block).
+// All addresses we use fit in 39 bits, so we don't need the L0 level.
+//
 // We need:
-//   1 x L0 table (4KB)
 //   1 x L1 table (4KB)
 //   1 x L2 table for RAM region   (4KB) — maps 0x00000000-0x3FFFFFFF
 //   1 x L2 table for device region (4KB) — maps 0xC0000000-0xFFFFFFFF
-// Total: 16KB of page tables
+// Total: 12KB of page tables
 
 #include "mmu.h"
 #include "uart.h"
@@ -62,10 +63,9 @@
 #define BLOCK_NORMAL    (PT_VALID | PT_BLOCK | PT_AF | PT_ATTR(MT_NORMAL) | PT_ISH | PT_AP_RW_ALL)
 #define TABLE_ENTRY     (PT_VALID | PT_TABLE)
 
-// ---- Page tables (16KB-aligned, in BSS) ----
+// ---- Page tables (4KB-aligned, in BSS) ----
 // Using __attribute__((aligned)) puts them in BSS with proper alignment
 
-static unsigned long l0_table[512] __attribute__((aligned(4096)));
 static unsigned long l1_table[512] __attribute__((aligned(4096)));
 static unsigned long l2_ram_table[512] __attribute__((aligned(4096)));
 static unsigned long l2_dev_table[512] __attribute__((aligned(4096)));
@@ -79,7 +79,6 @@ void mmu_init(void) {
 
     // Zero all tables
     for (int i = 0; i < 512; i++) {
-        l0_table[i] = 0;
         l1_table[i] = 0;
         l2_ram_table[i] = 0;
         l2_dev_table[i] = 0;
@@ -105,12 +104,8 @@ void mmu_init(void) {
     l1_table[0] = (unsigned long)l2_ram_table | TABLE_ENTRY;
     l1_table[3] = (unsigned long)l2_dev_table | TABLE_ENTRY;
 
-    // ---- L0 table: 512 entries, each covers 512GB ----
-    // Entry 0: points to l1_table (covers 0x00000000 - 0x7FFFFFFFFF)
-    l0_table[0] = (unsigned long)l1_table | TABLE_ENTRY;
-
-    uart_puts("  L0 table at ");
-    uart_put_hex((unsigned long)l0_table);
+    uart_puts("  L1 table at ");
+    uart_put_hex((unsigned long)l1_table);
     uart_puts("\n");
 
     // Compiler barrier: force all page table stores to complete before
@@ -126,28 +121,28 @@ void mmu_init(void) {
     asm volatile("msr mair_el1, %0" :: "r"(mair));
 
     // ---- Configure TCR_EL1 (Translation Control Register) ----
-    // T0SZ = 16  → 48-bit VA space (2^48 = 256TB)
+    // T0SZ = 25  → 39-bit VA space (2^39 = 512GB), 3-level walk: L1→L2→block
     // IRGN0 = 01 → Normal, inner write-back write-allocate cacheable
     // ORGN0 = 01 → Normal, outer write-back write-allocate cacheable
     // SH0 = 11   → Inner shareable
     // TG0 = 00   → 4KB granule for TTBR0
     // EPD1 = 1   → Disable TTBR1 table walks (we don't use upper VA range)
-    // T1SZ = 16  → (unused since EPD1=1)
+    // T1SZ = 25  → (unused since EPD1=1, but must be valid)
     // TG1 = 10   → 4KB granule for TTBR1 (must be valid even if EPD1=1)
-    // IPS = 010  → 40-bit physical address space (1TB)
-    unsigned long tcr = (16UL << 0)   |  // T0SZ = 16
+    // IPS = 000  → 32-bit physical address space (4GB) — all our PAs fit
+    unsigned long tcr = (25UL << 0)   |  // T0SZ = 25 (39-bit VA, 3-level walk)
                         (1UL  << 8)   |  // IRGN0 = write-back
                         (1UL  << 10)  |  // ORGN0 = write-back
                         (3UL  << 12)  |  // SH0 = inner shareable
                         (0UL  << 14)  |  // TG0 = 4KB
-                        (16UL << 16)  |  // T1SZ = 16
+                        (25UL << 16)  |  // T1SZ = 25 (unused, EPD1=1)
                         (1UL  << 23)  |  // EPD1 = disable TTBR1 walks
                         (2UL  << 30)  |  // TG1 = 4KB (valid granule)
-                        (2UL  << 32);    // IPS = 40-bit PA
+                        (0UL  << 32);    // IPS = 000 = 32-bit PA (4GB)
     asm volatile("msr tcr_el1, %0" :: "r"(tcr));
 
-    // ---- Set TTBR0_EL1 to our L0 table ----
-    asm volatile("msr ttbr0_el1, %0" :: "r"((unsigned long)l0_table));
+    // ---- Set TTBR0_EL1 to our L1 table (3-level walk starts at L1) ----
+    asm volatile("msr ttbr0_el1, %0" :: "r"((unsigned long)l1_table));
     // Clear TTBR1 (not used, EPD1=1 disables its walks)
     asm volatile("msr ttbr1_el1, %0" :: "r"(0UL));
 
@@ -244,6 +239,6 @@ void mmu_dump_config(void) {
     uart_puts("  0xC0000000-0xFFFFFFFF  1GB Device (UART, GIC, timers)\n");
 
     uart_puts("\nPage tables: ");
-    uart_put_dec(4 * 4);
-    uart_puts(" KB (4 tables x 4KB)\n");
+    uart_put_dec(3 * 4);
+    uart_puts(" KB (3 tables x 4KB)\n");
 }
